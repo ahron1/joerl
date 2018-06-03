@@ -1,0 +1,8 @@
+*.beam
+*.log
+ebin*
+_rel*
+deps*
+*.dump
+priv*
+.erlang.mk*

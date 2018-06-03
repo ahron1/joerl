@@ -1,0 +1,38 @@
+-module(jo_app).
+-behaviour(application).
+
+-export([start/2]).
+-export([stop/1]).
+-export([reload_routes/0]).
+-on_reload(reload_routes/0).
+
+start(_Type, _Args) ->
+	Dispatch = make_dispatch(),
+	PrivDir = code:priv_dir(jo),
+	{ok, _} = cowboy:start_tls(https, [
+	{port, 8443},
+	{cacertfile, PrivDir ++ "/ssl/cowboy-ca.crt"},
+	{certfile, PrivDir ++ "/ssl/server.crt"},
+	{keyfile, PrivDir ++ "/ssl/server.key"}
+	], #{env => #{dispatch => Dispatch}}),
+	jo_sup:start_link().
+
+make_dispatch() ->
+	cowboy_router:compile([
+					  {'_', [{"/login", login_handler, []} 
+							 ,{"/uploadhandler", upload_handler, []}
+							 ,{"/messagehandler", message_handler, []}
+							 %,{"/getimages", get_images_handler, []}
+							 %,{"/submitvotes", votes_handler, []}
+							 ,{"/join/[:join_token]", join_handler, []}
+							 ,{"/resetpassword/[:pw_token]", pw_reset_handler, []}
+							 ,{"/activateaccount/[:activation_token]", account_activate_handler, []}
+							 ,{'_', general_handler, []}
+							 ]}
+						 ]).
+
+reload_routes() ->
+	cowboy:set_env(https, dispatch, make_dispatch()).
+
+stop(_State) ->
+	ok.
