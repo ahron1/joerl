@@ -2,7 +2,7 @@ PROJECT = jo
 PROJECT_DESCRIPTION = New project
 PROJECT_VERSION = 0.1.0
 
-DEPS = cowboy cowlib ranch pgo backoff opencensus wts ctx jsx counters rfc3339 crontab stdlib2 cronjobs edown proper 
+DEPS = cowboy cowlib ranch pgo backoff opencensus wts ctx jsx counters rfc3339 crontab stdlib2 cronjobs proper edown
 dep_cowboy = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/cowboy
 dep_cowlib = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/cowlib
 dep_ranch = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/ranch

@@ -4,3 +4,4 @@ ebin*
 _rel*
 deps*
 *.dump
+.erlang.mk*

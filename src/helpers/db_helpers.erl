@@ -298,7 +298,7 @@ image_details_to_db(UserId, NewFileName, Adj1, Adj2) ->
 
 %% get list of next 10 pics (with adjectives) not seen by given user
 get_new_pics(UserId) ->
-	pp_db:extended_query("
+	{{select, _N}, ImgAdjTupleList} = pp_db:extended_query("
 		with 
 	    userid as ( 
 	    select ($1::int) as id
@@ -311,7 +311,9 @@ get_new_pics(UserId) ->
   	   from pic_adj_adj
   	   where pic_adj_adj.picture not in (select target from p)
   	   fetch first 10 rows only
-	", [UserId]).
+	", [UserId]),
+	JsonList = image_helpers:tuple_list_to_json(ImgAdjTupleList),
+	erlang:display(JsonList).
 
 %% store message to server. 
 %store_message(User, SenderName, SenderEmail, MessageContent) ->
