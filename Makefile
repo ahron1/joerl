@@ -1,13 +1,12 @@
 PROJECT = jo
-PROJECT_DESCRIPTION = project demo
-PROJECT_VERSION = 1
+PROJECT_DESCRIPTION = New project
+PROJECT_VERSION = 0.1.0
 
 DEPS = cowboy cowlib ranch pgo backoff opencensus wts ctx jsx counters rfc3339 crontab stdlib2 cronjobs edown proper 
-
 dep_cowboy = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/cowboy
-dep_cowboy_commit = master
-dep_cowlib = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/cowlib 
+dep_cowlib = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/cowlib
 dep_ranch = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/ranch
+dep_cowboy_commit = master
 
 dep_pgo = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/pgo
 dep_backoff = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/backoff
@@ -20,28 +19,21 @@ dep_edown = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/edown
 dep_rfc3339 = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/rfc3339
 dep_proper = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/proper
 
-#dep_pgapp = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/pgapp
-#dep_epgsql = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/epgsql
-#dep_poolboy = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/poolboy
-
-dep_gen_leader = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/gen_leader 
-#dep_pgsql = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/pgsql
-#dep_gproc = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/gproc 
-#dep_episcina = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/episcina
-
-#dep_gen_smtp = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/gen_smtp
-
 dep_crontab = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/crontab
 dep_stdlib2 = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/stdlib2
 dep_cronjobs = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/cronjobs
 
-BUILD_DEPS = reload_mk
-DEP_PLUGINS = reload_mk
+#dep_gen_smtp = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/gen_smtp
+
+BUILD_DEPS = reload_mk elvis_mk
+DEP_PLUGINS = reload_mk elvis_mk
 dep_reload_mk = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/reload.mk
+dep_elvis_mk = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/elvis.mk
 
 #LOCAL_DEPS = inets ssl
 
 #to disable dev mode and prevent symlinking. 
-RELX_OPTS = -d false
+#RELX_OPTS = -d false
+
 
 include erlang.mk
