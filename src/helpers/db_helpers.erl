@@ -1,5 +1,5 @@
 -module(db_helpers).
--export([id_pw_given_login/1, check_session_cookie/1, create_session_cookie/1, cookie_given_id/1, create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1, activation_given_login/1, new_account_creation/2, id_given_signup_token/1, activate_new_account/1, image_details_to_db/4, get_new_pics/1]).
+-export([id_pw_given_login/1, check_session_cookie/1, create_session_cookie/1, cookie_given_id/1, create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1, activation_given_login/1, new_account_creation/1, id_given_signup_token/1, activate_new_account/1, image_details_to_db/4, get_new_pics/1]).
 
 %% add is_account_active to id/pw/queries
 %% hash pw, and check pw directly in db.
@@ -19,7 +19,7 @@ activation_given_login(FormLogin) ->
 	{{select,N}, ActivationTupleList}.
 
 %% new (inactive) account creation using given login/pw
-new_account_creation(Login, Password) ->
+new_account_creation(Login) ->
 	{{select, 1}, TokenTupleList} = pp_db:extended_query("
 		with 
 			person as (
@@ -33,8 +33,8 @@ new_account_creation(Login, Password) ->
 			returning id
 			)
 			,person_property_credentials as (
-			insert into person_property_credentials (property_of, email, password_text, has_signed_up) 
-			select id, (select $1), (select $2), true from person
+			insert into person_property_credentials (property_of, email, has_signed_up) 
+			select id, (select $1), true from person
 			returning id
 			)
 			,person_property_signup_tokens as (
@@ -43,7 +43,7 @@ new_account_creation(Login, Password) ->
 			returning token_value
 			)
 		select token_value from person_property_signup_tokens
-		", [Login, Password]),
+		", [Login ]),
 	{{select, 1}, TokenTupleList}.
 
 %%signup token validation
@@ -70,7 +70,7 @@ cookie_given_id(Id) ->
 	end,
 	{N, CookieTupleList}.
 
-%% check in db if cookie exists. Get Id given cookie
+%% check in db if cookie exists. Get Id given cookie and update cookie timestamp
 check_session_cookie(Cookie) ->
 	%add something like where is_valid=1 to query to check only for valid cookies
 	{{select,N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_session p where cookie = $1 and p.is_cookie_valid = true", [Cookie]),
@@ -310,10 +310,10 @@ get_new_pics(UserId) ->
    	   select *
   	   from pic_adj_adj
   	   where pic_adj_adj.picture not in (select target from p)
-  	   fetch first 10 rows only
+  	   fetch first 5 rows only
 	", [UserId]),
-	JsonList = image_helpers:tuple_list_to_json(ImgAdjTupleList),
-	erlang:display(JsonList).
+	%erlang:display(ImgAdjTupleList),
+	ImgAdjTupleList.
 
 %% store message to server. 
 %store_message(User, SenderName, SenderEmail, MessageContent) ->

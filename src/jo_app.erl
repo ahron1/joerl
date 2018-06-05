@@ -22,7 +22,7 @@ make_dispatch() ->
 					  {'_', [{"/login", login_handler, []} 
 							 ,{"/uploadhandler", upload_handler, []}
 							 ,{"/messagehandler", message_handler, []}
-							 %,{"/getimages", get_images_handler, []}
+							 ,{"/imagehandler", image_handler, []}
 							 %,{"/submitvotes", votes_handler, []}
 							 ,{"/join/[:join_token]", join_handler, []}
 							 ,{"/resetpassword/[:pw_token]", pw_reset_handler, []}

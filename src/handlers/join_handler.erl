@@ -18,7 +18,7 @@ init(Req0, State) ->
 
 %%for a brand new user request, check various conditions and process the request
 new_join_req(Req0) ->
-	{Login, Password, Inviter} = entry_helpers:extract_login_pw_inviter(Req0),
+	{Login, Inviter} = entry_helpers:extract_login_pw_inviter(Req0),
 
 	%check if there are any details in the db for that account to verify that it is indeed a "brand new" user
 	{{select,N}, ActivationTupleList} = db_helpers:activation_given_login(Login),
@@ -44,7 +44,7 @@ new_join_req(Req0) ->
 					%todo: use new status code for js redir to homepage/reload
 					;
 				_ ->
-					create_new_account(Login, Password, Inviter, IsPreactivatedAccount, IsValidInviter)
+					create_new_account(Login, Inviter, IsPreactivatedAccount, IsValidInviter)
 			end
 	end.
 
@@ -79,22 +79,22 @@ activate_new_account(_, _) ->
 	{200, #{<<"content-type">> => <<"text/plain">>}, <<"erroneous activation request">>}.
 
 %%actual creation of the account depending on conditions
-%create_new_account(Login, Password, Inviter, IsPreactivatedAccount, IsValidInviter)
-%create_new_account(Login, Password, _, is_preactivated_account, _) ->
+%create_new_account(Login, Inviter, IsPreactivatedAccount, IsValidInviter)
+%create_new_account(Login, _, is_preactivated_account, _) ->
 %	create_new_account(Login),
 %	activate_new_account(login, Login)
 %	use atom login/token in tuple to distinguish direct activation vs activation via emailed url with token
 %	;
 
-%create_new_account(Login, Password, Inviter, IsPreactivatedAccount, IsValidInviter)
-%create_new_account(Login, Password, Inviter, _, is_valid_inviter) -> 
+%create_new_account(Login, Inviter, IsPreactivatedAccount, IsValidInviter)
+%create_new_account(Login, Inviter, _, is_valid_inviter) -> 
 %	create_new_account(Login),
 %	;
 
-%create_new_account(Login, Password, Inviter, IsPreactivatedAccount, IsValidInviter)
-create_new_account(Login, Password, _, _, _) -> 
+%create_new_account(Login, Inviter, IsPreactivatedAccount, IsValidInviter)
+create_new_account(Login, _, _, _) -> 
 		erlang:display(new_acc_creation_req),
-		{{select, N}, TokenTupleList} = db_helpers:new_account_creation(Login, Password),
+		{{select, N}, TokenTupleList} = db_helpers:new_account_creation(Login),
 		case N of
 			1 ->
 				erlang:display(TokenTupleList),

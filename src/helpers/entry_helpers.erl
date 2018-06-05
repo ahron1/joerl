@@ -33,9 +33,11 @@ extract_login_pw_inviter(OriginalRequest) ->
 	{ok, FormLogin, Req3} = cowboy_req:read_part_body(Req2),
 
 	{ok, _Headers2, Req4} = cowboy_req:read_part(Req3),
-	{ok, FormPassword, Req5} = cowboy_req:read_part_body(Req4),
+	%{ok, FormPassword, Req5} = cowboy_req:read_part_body(Req4),
+	{ok, InviterEmail, _Req5} = cowboy_req:read_part_body(Req4),
 
-	{ok, _Headers3, Req6} = cowboy_req:read_part(Req5),
-	{ok, InviterEmail, _Req7} = cowboy_req:read_part_body(Req6),
+%	{ok, _Headers3, Req6} = cowboy_req:read_part(Req5),
+%	{ok, InviterEmail, _Req7} = cowboy_req:read_part_body(Req6),
 
-	{FormLogin, FormPassword, InviterEmail}.
+	%{FormLogin, FormPassword, InviterEmail}.
+	{FormLogin, InviterEmail}.

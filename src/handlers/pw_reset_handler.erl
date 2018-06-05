@@ -145,7 +145,7 @@ reset_form_body() ->
 		</script>
 	</head>
 	<body>
-		<u><b>Password Reset Form</b></u>
+		<u><b>This is a secure form to reset your password </b></u>
 		<br><br>
 		<label for=\"Email\" >Enter your email: </label>
 		<br>
