@@ -5,19 +5,22 @@ extract(List) ->
 	Acc0 = [{<<"picid">>, []}, {<<"adj1">>, []}, {<<"adj2">>, []}, {<<"uri">>, []}],
 	lists:foldl(func(), Acc0, List).
 
-%anon fun for use in foldl accumulator
+%anon fun for use in foldl accumulator. get the data bits (e.g. adj1, picid) from the db output and append them to their respective sublists. 
 func() ->
 	fun(Item, List) -> 
-			[{<<"picid">>, PicId}, {<<"adj1">>, Adj1}, {<<"adj2">>, Adj2}, {<<"uri">>, Uri}] = make_tuple_list(Item),
+			%[{<<"picid">>, PicId}, {<<"adj1">>, Adj1}, {<<"adj2">>, Adj2}, {<<"uri">>, Uri}] = make_tuple_list(Item),
+			{PicIdInt, {citext, Adj1}, {citext, Adj2}, Uri} = Item,
+			PicId = erlang:list_to_binary(erlang:integer_to_list(PicIdInt)),
+
 			[{<<"picid">>, ListPicId}, {<<"adj1">>, ListAdj1}, {<<"adj2">>, ListAdj2}, {<<"uri">>, ListUri}] = List,
 			[{<<"picid">>, ListPicId ++ [PicId]}, {<<"adj1">>, ListAdj1 ++ [Adj1]}, {<<"adj2">>, ListAdj2 ++ [Adj2]}, {<<"uri">>, ListUri ++ [Uri]}]
 	end.
 
 %internal function. pad the db output to make a proper list of tuples. 
-make_tuple_list({PicIdInt, {citext, Adj1}, {citext, Adj2}, Uri}) ->
-	PicId = erlang:list_to_binary(erlang:integer_to_list(PicIdInt)),
-	TupleList = [{<<"picid">>, PicId}, {<<"adj1">>, Adj1}, {<<"adj2">>, Adj2}, {<<"uri">>, Uri}],
-	TupleList.
+%make_tuple_list({PicIdInt, {citext, Adj1}, {citext, Adj2}, Uri}) ->
+%	PicId = erlang:list_to_binary(erlang:integer_to_list(PicIdInt)),
+%	TupleList = [{<<"picid">>, PicId}, {<<"adj1">>, Adj1}, {<<"adj2">>, Adj2}, {<<"uri">>, Uri}],
+%	TupleList.
 
 
 %old funs

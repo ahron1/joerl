@@ -19,34 +19,8 @@ init(Req0, State) ->
 %%for a brand new user request, check various conditions and process the request
 new_join_req(Req0) ->
 	{Login, Inviter} = entry_helpers:extract_login_pw_inviter(Req0),
-
-	%check if there are any details in the db for that account to verify that it is indeed a "brand new" user
-	{{select,N}, ActivationTupleList} = db_helpers:activation_given_login(Login),
-	erlang:display(ActivationTupleList),
-	HasActiveAccount = has_active_account(N, ActivationTupleList), %this gets set to true when the account is activated (by clicking on token)
-	HasSignedUp = has_signed_up(N, ActivationTupleList), % this is set to true when the user signs up
-	IsValidInviter = is_valid_inviter(Inviter), 
-	IsPreactivatedAccount = is_preactivated_account(N, ActivationTupleList), %Preactivated account is one that was originally invited by the system. 
-	
-	case HasActiveAccount of 
-		has_active_account -> 
-			%given login already has active functioning account
-			{200, #{<<"content-type">> => <<"text/plain">>}, <<"there's already an account for this email. try logging in.">>}
-			%todo: use new status code for js redir to homepage/reload
-			;
-		_ ->
-			%given login doesn't have account.
-			%but if user has signed up (and is on waiting list), ask to wait. 
-			case HasSignedUp of
-				has_signed_up ->
-					erlang:display(already_on_waiting_list),
-					{200, #{<<"content-type">> => <<"text/plain">>}, <<"you're already on the waiting list. We'll activate your account ASAP">>}
-					%todo: use new status code for js redir to homepage/reload
-					;
-				_ ->
-					create_new_account(Login, Inviter, IsPreactivatedAccount, IsValidInviter)
-			end
-	end.
+	{HasActiveAccount, HasSignedUp, IsPreactivatedAccount, IsValidInviter} = get_join_req_details(Login, Inviter),
+	check_and_create_account(HasActiveAccount, HasSignedUp, IsPreactivatedAccount, IsValidInviter, Login, Inviter).
 
 %the url contains a token, check if it is valid. (if user doesn't have account??) call variously defined fun to process further (activate account)
 %todo: send html form to enter password (pre-entered email id) if token is valid. as in pw reset. hide pw field in signup form. 
@@ -62,21 +36,31 @@ process_token(JoinToken) ->
 			{200, #{<<"content-type">> => <<"text/plain">>}, <<"invalid token">>}
 	end.
 
-%%activate account by creating db entry
-activate_new_account(token_is_not_activated, Id) ->
-	ActivationSuccess = db_helpers:activate_new_account(Id),
-	case ActivationSuccess of
-		ok ->
-			{200, #{<<"content-type">> => <<"text/plain">>}, <<"account activated ok. try logging in.">>};
-		_ ->
-			{200, #{<<"content-type">> => <<"text/plain">>}, <<"problem with account activation. try again.">>}
-	end;
+%get details about account status and inviter status 
+get_join_req_details(Login, Inviter) ->
+	{{select,N}, ActivationTupleList} = db_helpers:activation_given_login(Login),
 
-activate_new_account(token_is_activated, _) ->
-	{200, #{<<"content-type">> => <<"text/plain">>}, <<"account already activated. try logging in">>};
+	HasActiveAccount = has_active_account(N, ActivationTupleList), %this gets set to true when the account is activated (by clicking on token)
+	HasSignedUp = has_signed_up(N, ActivationTupleList), % this is set to true when the user signs up
+	IsPreactivatedAccount = is_preactivated_account(N, ActivationTupleList), %Preactivated account is one that was originally invited by the system. 
+	IsValidInviter = is_valid_inviter(Inviter), 
 
-activate_new_account(_, _) ->
-	{200, #{<<"content-type">> => <<"text/plain">>}, <<"erroneous activation request">>}.
+	{HasActiveAccount, HasSignedUp, IsPreactivatedAccount, IsValidInviter}.
+
+%check join req details and create new account
+%check_and_create_account(HasActiveAccount, HasSignedUp, IsPreactivatedAccount, IsValidInviter, Login, Inviter).
+check_and_create_account(has_active_account, _, _, _, _, _) ->
+	%given login already has active functioning account
+	%todo: use new status code for js redir to homepage/reload
+	{200, #{<<"content-type">> => <<"text/plain">>}, <<"there's already an account for this email. try logging in.">>};
+
+check_and_create_account(_, has_signed_up, _, _, _, _) ->
+	erlang:display(already_on_waiting_list),
+	%todo: use new status code for js redir to homepage/reload
+	{200, #{<<"content-type">> => <<"text/plain">>}, <<"you're already on the waiting list. We'll activate your account ASAP">>};
+
+check_and_create_account(_, _, IsPreactivatedAccount, IsValidInviter, Login, Inviter) ->
+	create_new_account(Login, Inviter, IsPreactivatedAccount, IsValidInviter).
 
 %%actual creation of the account depending on conditions
 %create_new_account(Login, Inviter, IsPreactivatedAccount, IsValidInviter)
@@ -187,4 +171,20 @@ is_token_activated(IsTokenActivated) ->
 		_ ->
 			erroneous_token
 	end.
+
+%%activate account by creating db entry
+activate_new_account(token_is_not_activated, Id) ->
+	ActivationSuccess = db_helpers:activate_new_account(Id),
+	case ActivationSuccess of
+		ok ->
+			{200, #{<<"content-type">> => <<"text/plain">>}, <<"account activated ok. try logging in.">>};
+		_ ->
+			{200, #{<<"content-type">> => <<"text/plain">>}, <<"problem with account activation. try again.">>}
+	end;
+
+activate_new_account(token_is_activated, _) ->
+	{200, #{<<"content-type">> => <<"text/plain">>}, <<"account already activated. try logging in">>};
+
+activate_new_account(_, _) ->
+	{200, #{<<"content-type">> => <<"text/plain">>}, <<"erroneous activation request">>}.
 

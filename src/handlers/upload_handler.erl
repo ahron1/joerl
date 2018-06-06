@@ -7,27 +7,47 @@
 %%to do later: abstract above into new module across (upload, message, profile?, etc.) handlers
 
 init(Req0, Opts) ->
-	MaxFileSize = 4500000, %bytes
-	MaxFileName = 200, %characters
 	{CookieStatus, User} = entry_helpers:check_session_cookie(Req0),
 	%check if user is logged in before processing uploaded file/info
-	{Body, Status} = case CookieStatus of
-		has_no_session_cookie ->
-			ResponseBody = <<"Not logged in">>,
-			ResponseStatus = 400,
-			{ResponseBody, ResponseStatus};
-		has_session_cookie ->
-			{FileData, FileName, FileSize, Adj1, Adj2} = extract_file_and_adjs(Req0),
-			{FileNameWithPrefix, FileNameWithPath} = create_file_name_for_storage(FileName),
-			{ResponseBody, ResponseStatus} = file_storage(FileSize, MaxFileSize, MaxFileName, FileNameWithPath, FileData),
-			{_NewImageId, _Adj1Text, _Adj2Text} = db_helpers:image_details_to_db(User, FileNameWithPrefix, Adj1, Adj2),
-			{ResponseBody, ResponseStatus}
-	end,
-	{ResponseBody_r, ResponseStatus_r} = {Body, Status},
+	{ResponseBody_r, ResponseStatus_r} = upload_processor(CookieStatus, User, Req0),
+
+%	MaxFileSize = 4500000, %bytes
+%	MaxFileName = 200, %characters
+
+%	{Body, Status} = case CookieStatus of
+%		has_no_session_cookie ->
+%			ResponseBody = <<"Not logged in">>,
+%			ResponseStatus = 400,
+%			{ResponseBody, ResponseStatus};
+%		has_session_cookie ->
+%			{FileData, FileName, FileSize, Adj1, Adj2} = extract_file_and_adjs(Req0),
+%			{FileNameWithPrefix, FileNameWithPath} = create_file_name_for_storage(FileName),
+%			{ResponseBody, ResponseStatus} = file_storage(FileSize, MaxFileSize, MaxFileName, FileNameWithPath, FileData),
+%			{_NewImageId, _Adj1Text, _Adj2Text} = db_helpers:image_details_to_db(User, FileNameWithPrefix, Adj1, Adj2),
+%			{ResponseBody, ResponseStatus}
+%	end,
+%	{ResponseBody_r, ResponseStatus_r} = {Body, Status},
+
 	Req = cowboy_req:reply(ResponseStatus_r, #{
 		<<"content-type">> => <<"text/html">>
 		}, ResponseBody_r, Req0),
 		{ok, Req, Opts}.
+
+%% check loggedin status and process upload request
+upload_processor(has_session_cookie, User, Req0) ->
+	MaxFileSize = 4500000, %bytes
+	MaxFileName = 200, %characters
+	{FileData, FileName, FileSize, Adj1, Adj2} = extract_file_and_adjs(Req0),
+	{FileNameWithPrefix, FileNameWithPath} = create_file_name_for_storage(FileName),
+	{ResponseBody, ResponseStatus} = file_storage(FileSize, MaxFileSize, MaxFileName, FileNameWithPath, FileData),
+	{_NewImageId, _Adj1Text, _Adj2Text} = db_helpers:image_details_to_db(User, FileNameWithPrefix, Adj1, Adj2),
+	{ResponseBody, ResponseStatus};
+
+upload_processor(_, _, _) ->
+	ResponseBody = <<"Not logged in">>,
+	ResponseStatus = 400,
+	{ResponseBody, ResponseStatus}.
+
 
 %%extract the File data, file name and adjectives from incoming req
 extract_file_and_adjs(Req) ->
@@ -78,27 +98,23 @@ create_file_name_for_storage(FileName) ->
 
 	{FileNameWithPrefix, FileNameWithPath}.
 
-%%if filesize is okay, store and create response
-file_storage(FileSize, MaxFileSize, MaxFileName, FileNameWithPath, FileData) ->
-	case FileSize < MaxFileSize of
-		true -> 
-			case length(FileNameWithPath) < MaxFileName of
-				true -> 
-					{ok, WriteHandle} = file:open(FileNameWithPath, write),
-					io:format(WriteHandle, "~s", [FileData]),
-					% consider opening file in raw mode using file:write (faster)
-					file:close(WriteHandle),
-					Body = <<"File uploaded successfully">>,
-					Status = 200,
-					{Body, Status};
-				false ->
-					Body = <<"File name too long">>,
-					Status = 500,
-					{Body, Status}
-			end;
-		false ->
-			Body = <<"File too large">>,
-			Status = 500,
-			{Body, Status}
-	end.
+%%if filesize is okay, store file (in filesystem) and create response
+file_storage(FileSize, MaxFileSize, MaxFileName, FileNameWithPath, FileData) when (FileSize < MaxFileSize) and (length(FileNameWithPath) < MaxFileName) ->
+	{ok, WriteHandle} = file:open(FileNameWithPath, write),
+	io:format(WriteHandle, "~s", [FileData]),
+	% consider opening file in raw mode using file:write (faster)
+	file:close(WriteHandle),
+	Body = <<"File uploaded successfully">>,
+	Status = 200,
+	{Body, Status};
+
+file_storage(FileSize, MaxFileSize, _MaxFileName, _FileNameWithPath, _FileData) when (FileSize > MaxFileSize) -> 
+	Body = <<"File too large">>,
+	Status = 500,
+	{Body, Status};
+
+file_storage(_FileSize, _MaxFileSize, MaxFileName, FileNameWithPath, _FileData) when  (length(FileNameWithPath) > MaxFileName) ->
+	Body = <<"File name too long">>,
+	Status = 500,
+	{Body, Status}.
 

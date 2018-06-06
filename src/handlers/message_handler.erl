@@ -5,14 +5,16 @@
 
 %%to do: add new funs to check req body to send ERRONEOUS REQ like in login handler
 %%to do later: abstract above into new module
+%%
+%%to do: save message to db. 
 
 init(Req0, Opts) ->
 
-	{_Cookie_status, _User} = entry_helpers:check_session_cookie(Req0),
+	{_CookieStatus, _User} = entry_helpers:check_session_cookie(Req0),
 %% remove cookie status check in both erl and js - anyone can send message. 
 %% use this format - both erl and js - for uploads. 
 
-%	case Cookie_status of
+%	case CookieStatus of
 %		has_no_session_cookie ->
 %			ResponseBody = <<"Not logged in">>,
 %			ResponseStatus = 400,
