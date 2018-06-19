@@ -6,6 +6,8 @@
 -export([reload_routes/0]).
 -on_reload(reload_routes/0).
 
+-include_lib("deps/erl_img/include/erl_img.hrl").
+
 start(_Type, _Args) ->
 	Dispatch = make_dispatch(),
 	PrivDir = code:priv_dir(jo),
@@ -22,7 +24,8 @@ make_dispatch() ->
 					  {'_', [{"/login", login_handler, []} 
 							 ,{"/uploadhandler", upload_handler, []}
 							 ,{"/messagehandler", message_handler, []}
-							 ,{"/imagehandler", image_handler, []}
+							 ,{"/imagehandler", new_images_handler, []}
+							 ,{"/voteshandler", votes_handler, []}
 							 %,{"/submitvotes", votes_handler, []}
 							 ,{"/join/[:join_token]", join_handler, []}
 							 ,{"/resetpassword/[:pw_token]", pw_reset_handler, []}

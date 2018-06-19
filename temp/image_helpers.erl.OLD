@@ -1,0 +1,26 @@
+-module(image_helpers).
+-export([tuple_list_to_json/1 ]).
+
+tuple_list_to_json(L) ->
+	lists:filtermap(fun(X) -> {true, pic_adj_set_to_json(X)} end, L).
+
+%internal function. pad the db output to make a proper tuple of tuples. 
+pic_adj_set_to_json({PicId, {citext, Adj1}, {citext, Adj2}, Uri}) ->
+	 ListOfTuples = [{<<"picid">>, PicId}, {<<"adj1">>, Adj1}, {<<"adj2">>, Adj2}, {<<"uri">>, Uri}],
+	 %ListOfTuples = erlang:tuple_to_list(TupleOfTuples),
+	 jsx:encode(ListOfTuples).
+
+%internal function. pad the db output to make a proper list of tuples. 
+make_tuple_list({PicId, {citext, Adj1}, {citext, Adj2}, Uri}) ->
+	 ListOfTuples = [{picid, PicId}, {adj1, Adj1}, {adj2, Adj2}, {uri, Uri}],
+	 ListOfTuples.
+	
+%
+%func() ->
+%	fun(X, L) -> 
+%			{_, Y} = X,
+%			L ++ [Y] end.
+%
+%extract(List) ->
+%	%lists:foldl(fun(X, L) -> L ++ [X] end, [], List).
+%	lists:foldl(func(), [], List).

@@ -1,5 +1,10 @@
 -module(db_helpers).
--export([id_pw_given_login/1, check_session_cookie/1, create_session_cookie/1, cookie_given_id/1, create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1, activation_given_login/1, new_account_creation/1, id_given_signup_token/1, activate_new_account/1, image_details_to_db/4, get_new_pics/1]).
+
+-export([activation_given_login/1, new_account_creation/1, id_given_signup_token/1, activate_new_account/1]). 
+-export([id_pw_given_login/1, check_session_cookie/1, create_session_cookie/1, cookie_given_id/1]). 
+-export([create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1]).
+-export([image_details_to_db/6, get_new_pics/1, record_votes/5]).
+-export([materialized_view/2, update_vetted_adj/0]).
 
 %% add is_account_active to id/pw/queries
 %% hash pw, and check pw directly in db.
@@ -134,7 +139,7 @@ disable_pw_token(Id) ->
 
 % %% imagery
 %% save image details to db
-image_details_to_db(UserId, NewFileName, Adj1, Adj2) ->
+image_details_to_db(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
 	{{select, 1}, [{NewImageId, {citext, Adj1Text}, {citext, Adj2Text}}]} = pp_db:extended_query("
 		with 
 		   -- input details from server
@@ -144,11 +149,17 @@ image_details_to_db(UserId, NewFileName, Adj1, Adj2) ->
 		   ,picfilename as ( 
 		   select ($2) as filename
 		   )
+		   ,picuri as ( 
+		   select ($3) as uri
+		   )
+		   ,completepath as ( 
+		   select ($4) as path
+		   )
 		   ,inputword1 as ( 
-		   select ($3) as inputword
+		   select ($5) as inputword
 		   )
 		   ,inputword2 as (
-		   select ($4) as inputword
+		   select ($6) as inputword
 		   )
 		   -- check conditions and insert into db
 		   ,w1 as ( 
@@ -163,9 +174,11 @@ image_details_to_db(UserId, NewFileName, Adj1, Adj2) ->
 		   returning id
 		   )
 		   ,ap1 as (
-		   insert into adjective_property (word, property_of, is_adjective_active) 
-		   select (select inputword from inputword1), id, 'true'
+		   insert into adjective_property (word, property_of) 
+		   select (select inputword from inputword1), id
 		   from   a1
+		   on conflict  
+		   do nothing  --on duplicate file (name) do nothing (fail silently)
 		   returning word, property_of
 		   )
 		   ,w2 as (
@@ -180,9 +193,11 @@ image_details_to_db(UserId, NewFileName, Adj1, Adj2) ->
 		   returning id
 		   )
 		   ,ap2 as (
-		   insert into adjective_property (word, property_of, is_adjective_active) 
-		   select (select inputword from inputword2), id, 'true'
+		   insert into adjective_property (word, property_of) 
+		   select (select inputword from inputword2), id
 		   from   a2
+		   on conflict  
+		   do nothing  --on duplicate file (name) do nothing (fail silently)
 		   returning word, property_of
 		   ) 
 		   ,p as ( 
@@ -191,8 +206,10 @@ image_details_to_db(UserId, NewFileName, Adj1, Adj2) ->
    		   returning id
  		   )     
  		   ,pp as (
- 		   insert into picture_property(property_of, is_picture_active, filename)
- 		   select id, 'true', (select filename from picfilename) from p
+ 		   insert into picture_property(property_of, filename, picture_uri, complete_path)
+ 		   select id, (select filename from picfilename), (select uri from picuri), (select path from completepath) from p
+		   on conflict  
+		   do nothing  --on duplicate file (name) do nothing (fail silently)
  		   )
  		   ,person2p as (
  		   insert into person_to_picture(source, target)
@@ -293,7 +310,7 @@ image_details_to_db(UserId, NewFileName, Adj1, Adj2) ->
 		join ap1 on ap1.property_of = a2p1.source
 		join a2p2 on p.id = a2p2.target
 		join w2 on w2.property_of = a2p2.source
-	", [UserId, NewFileName, Adj1, Adj2]),
+	", [UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2]),
 	{NewImageId, Adj1Text, Adj2Text}.
 
 %% get list of next 10 pics (with adjectives) not seen by given user
@@ -314,6 +331,121 @@ get_new_pics(UserId) ->
 	", [UserId]),
 	%erlang:display(ImgAdjTupleList),
 	ImgAdjTupleList.
+
+%% write votes to db
+record_votes(Adj1, Adj2, VoteChoice, PicId, UserId) ->
+	pp_db:extended_query("
+		with
+			adj1 as ( --get from client/server code
+				select ($1::int) as id
+				)
+			,adj2 as ( --get from client/server code
+				select ($2::int) as id
+				)
+			,vote_choice as (--get from client/server code
+				select ($3::smallint) as vote
+				)	
+			,picture as ( --get from client/server code
+				select ($4::int) as id
+				)
+			,userid as ( --get from client/server code
+				select ($5::int) as id
+				)
+			,person2pic as ( --either person to pic edge exists
+				select id 
+				from person_to_picture
+				where 
+					source = (select id from userid)
+						and
+					target = (select id from picture)
+				)
+			,person2pic_new as ( --or person to pic edge will be created
+				insert into person_to_picture(source, target)
+				select (select id from userid), id 
+				from picture
+				where not exists (select from person2pic) --if person to pic edge doesn't already exist
+				returning id
+				)
+			,person2pic_vote as ( -- to check if the vote for this specific combination (person, pic, adj1/2) already exists
+				select id from person_to_picture_property_voting_log
+				where 
+				property_of = (select id from person2pic) --only existing edge prop needs to be checked, since a new edge wouldn't have it anyway
+					and 
+					(((adjective_1 = (select id from adj1)) and (adjective_2 = (select id from adj2))) 
+						or ((adjective_1 = (select id from adj2)) and (adjective_2 = (select id from adj1)))
+						)
+				)
+			-- it is not (yet) being checked if the adj/pic are indeed linked. it is assumed the server/client are sending good info
+		    insert into person_to_picture_property_voting_log (adjective_1, adjective_2, property_of, vote_choice)
+				select id
+				,(select id from adj2)
+				,((select id from person2pic) union all (select id from person2pic_new)) -- this union implies the uploader can vote on their own pic
+				-- to disable uploader from voting on own pic, use only from person2pic_new above (to ensure only newly created edge is used) 
+				-- the is_uploader field might/not need to be checked before inserting.
+				,(select vote from vote_choice)
+				from adj1
+			where not exists (select from person2pic_vote) -- check the vote for this specific combination (person, pic, adj1/2) doesnt already exist
+			returning id
+	", [Adj1, Adj2, VoteChoice, PicId, UserId]).
+%	ImgAdjTupleList.
+
+% %% maintenance and updates
+%% materialized view
+%{{select, _N}, []} = 
+materialized_view(create, pic_adj_adj) ->
+	pp_db:simple_query(" 
+		  create materialized view pic_adj_adj as 
+		  select
+			a2p.target AS picture
+			,(select ap.word where ap.property_of = a2a.source) as adj1
+			,(select ap.property_of where ap.property_of = a2a.source) as adj1_id
+			,(select ap2.word where ap2.property_of = a2a.target) as adj2
+			,(select ap2.property_of where ap2.property_of = a2a.target) as adj2_id
+			,pp.picture_uri as uri
+		  from 
+			adjective_to_adjective as a2a 
+			join adjective_property as ap on ((a2a.source=ap.property_of) and (ap.is_adjective_active=true))
+			join adjective_property as ap2 on ((a2a.target=ap2.property_of) and (ap2.is_adjective_active=true)) 
+			join adjective_to_adjective_property as a2ap on ((a2ap.property_of = a2a.id) and (a2ap.is_pair=true))
+			join adjective_to_picture as a2p on ((a2p.source = a2a.source))
+			join adjective_to_picture as a2p2 on ((a2p2.source = a2a.target) and (a2p.target = a2p2.target))
+			join adjective_to_picture_property as a2pp on ((a2p.id = a2pp.property_of) and (a2pp.show_adjective_with_picture=true))
+			join adjective_to_picture_property as a2pp2 on ((a2p2.id = a2pp2.property_of) and (a2pp2.show_adjective_with_picture=true))
+			join picture_property as pp on ((pp.property_of=a2p.target) and (pp.is_picture_active=true) and (pp.malware_free=true))
+		");
+materialized_view(select, pic_adj_adj) ->
+	pp_db:simple_query("select * from pic_adj_adj");
+%{{drop, materialized_view}, []} = 
+materialized_view(drop, pic_adj_adj) ->
+	pp_db:simple_query("drop materialized view pic_adj_adj");
+%{{refresh, materialized_view}, []} = 
+materialized_view(refresh, pic_adj_adj) ->
+	pp_db:simple_query("refresh materialized view pic_adj_adj").
+
+%%update adjective active status based on vetted status.  
+%is_adjective_active default and is_adjective_vetted both default to null. 
+%new pic/adj insertion query doesnt change this
+%manually set vetted to false for unacceptable adjs. then run this func. 
+%create materialized_view checks only for is_adjective_active and not is_adjective_vetted
+
+% since pgo doesn't support prepared statements, use a dummy cte to execute all the update transactions together.
+update_vetted_adj() ->
+	pp_db:simple_query("
+		with  
+			x as ( --dummy variable 
+					select (10) as y
+				)
+			,a as (
+				update adjective_property set is_adjective_active = true where is_adjective_active IS NULL 
+				)
+			,b as (
+				update adjective_property set is_adjective_active = false where is_adjective_active <> false and is_adjective_vetted = false
+				)
+			,c as (
+				update adjective_property set is_adjective_active = true where is_adjective_active = false and is_adjective_vetted = true 
+				)
+			select y from x
+		").
 
 %% store message to server. 
 %store_message(User, SenderName, SenderEmail, MessageContent) ->

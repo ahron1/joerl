@@ -2,7 +2,7 @@ PROJECT = jo
 PROJECT_DESCRIPTION = New project
 PROJECT_VERSION = 0.1.0
 
-DEPS = cowboy cowlib ranch pgo backoff opencensus wts ctx jsx counters rfc3339 crontab stdlib2 cronjobs proper edown
+DEPS = cowboy cowlib ranch pgo backoff opencensus wts ctx jsx counters rfc3339 proper edown erl_img erlang_magic
 dep_cowboy = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/cowboy
 dep_cowlib = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/cowlib
 dep_ranch = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/ranch
@@ -19,9 +19,12 @@ dep_edown = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/edown
 dep_rfc3339 = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/rfc3339
 dep_proper = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/proper
 
-dep_crontab = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/crontab
-dep_stdlib2 = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/stdlib2
-dep_cronjobs = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/cronjobs
+#dep_crontab = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/crontab
+#dep_stdlib2 = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/stdlib2
+#dep_cronjobs = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/cronjobs
+
+dep_erl_img = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/erl_img
+dep_erlang_magic = cp ~/vm_shared_dir/cowboy_servers/erl_pkgs/erlang_magic
 
 #dep_gen_smtp = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/gen_smtp
 

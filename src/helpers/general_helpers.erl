@@ -1,5 +1,5 @@
 -module(general_helpers).
--export([escape_html/1, list_merge_no_sort/1]).
+-export([escape_html/1, list_merge_no_sort/1, zip4/4]).
 
 -define(QUOTE, $\").
 
@@ -63,3 +63,9 @@ list_merge_no_sort([H|[H1|T]]) ->
 	list_merge_no_sort([lists:append(H, H1)|T]);
 list_merge_no_sort([H|T]) ->
 	lists:append(H,T).
+
+%%zip 4 - to zip four lists into one. based on stdlib lists:zip3
+zip4([W | Ws], [X | Xs], [Y | Ys], [Z | Zs]) -> 
+	[{W, X, Y, Z} | zip4(Ws, Xs, Ys, Zs)];
+zip4([], [], [], []) -> 
+	[].
