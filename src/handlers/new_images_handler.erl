@@ -14,14 +14,17 @@ init(Req0, Opts) ->
 
 %% check logged in status and send list of images, adjs
 next_images(has_session_cookie, User) ->
+	%erlang:display(cookie_ok_in_new_img_handler),
+	%erlang:display(User),
 	NextImagesInfo = db_helpers:get_new_pics(User),
 	NextImagesAdjsList = image_helpers:extract(NextImagesInfo),
 	RBody = jsx:encode(NextImagesAdjsList),
-	%io:format("Body ~n~p~n", [RBody]),
+	%erlang:display(RBody),
 	RStatus = 200,
 	{RBody, RStatus};
 
 next_images(_, _) ->
+	%erlang:display(cookie_not_ok_in_new_img_handler),
 	RBody = <<"Not logged in">>,
 	RStatus = 400,
 	{RBody, RStatus}.
