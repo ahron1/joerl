@@ -3,7 +3,7 @@
 -export([activation_given_login/1, new_account_creation/1, id_given_signup_token/1, activate_new_account/1]). 
 -export([id_pw_given_login/1, check_session_cookie/1, create_session_cookie/1, cookie_given_id/1]). 
 -export([create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1]).
--export([image_details_to_db/6, get_new_pics/1, record_votes/5]).
+-export([image_details_to_db/6, get_new_pics/1, get_this_pic/1, record_votes/5]).
 -export([materialized_view/2, update_vetted_adj/0]).
 
 %% add is_account_active to id/pw/queries
@@ -329,6 +329,16 @@ get_new_pics(UserId) ->
   	   where pic_adj_adj.picture not in (select target from p)
   	   fetch first 5 rows only
 	", [UserId]),
+	%erlang:display(ImgAdjTupleList),
+	ImgAdjTupleList.
+
+%% get details of one specific pic
+get_this_pic(PicId) ->
+	{{select, _N}, ImgAdjTupleList} = pp_db:extended_query("
+   	   select *
+  	   from pic_adj_adj
+  	   where pic_adj_adj.picture = $1::int
+	", [PicId]),
 	%erlang:display(ImgAdjTupleList),
 	ImgAdjTupleList.
 
