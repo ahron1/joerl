@@ -23,7 +23,7 @@ votes_processor(has_session_cookie, User, VotesData) ->
 %	db_helpers:record_votes(Adj1, Adj2, Choice, Image, UserId),
 
 	VotesRecord = general_helpers:zip4(ImageList, Adj1List, Adj2List, ChoiceList),
-	erlang:display(VotesRecord),
+	%erlang:display(VotesRecord),
 	record_votes(User, VotesRecord),
 
 	RBody = <<"votes received ok">>,
@@ -44,15 +44,15 @@ record_votes(User, VotesRecord) ->
 			fun({ImageId, Adj1, Adj2, Vote}) ->
 				%{ImageId, Adj1, Adj2, Vote} = VotesRecord,
 				Choice = get_choice(Vote),
-
-				erlang:display(this_goes_in_db________check),
-				%erlang:display(erlang:binary_to_integer(Adj1)),
-				%erlang:display(erlang:binary_to_integer(Adj2)),
-				erlang:display(Choice),
-				erlang:display(erlang:binary_to_integer(ImageId)),
-				erlang:display(User),
-				erlang:display(this_goes_in_db________check),
+%				erlang:display(this_goes_in_db________check),
+%				erlang:display(erlang:binary_to_integer(Adj1)),
+%				erlang:display(erlang:binary_to_integer(Adj2)),
+%				erlang:display(Choice),
+%				erlang:display(erlang:binary_to_integer(ImageId)),
+%				erlang:display(User),
+%				erlang:display(this_goes_in_db________check),
 				db_helpers:record_votes(Adj1, Adj2, Choice, erlang:binary_to_integer(ImageId), User)
+%				erlang:display(this_went_in_db________check)
 			end
 		  , VotesRecord).
 

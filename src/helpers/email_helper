@@ -1,5 +1,0 @@
-gen_smtp_client:send({"arunanda1985222", ["shriyogeshchandra@gmail.
-com"],  "Subject: testing\r\nFrom: Arun Nanda <arunanda1985@gmail.com>\r\nTo: Master Yoge
-sh <shriyogeshchandra@gmail.com>\r\n\r\nThis is the email body"},   [{relay, "smtp.gmail.
-com"}, {tls, always}, {port, 587}, {username, "arunanda1985@gmail.com"}, {password, "Daki
-ni1234"}]).

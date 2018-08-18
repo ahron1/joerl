@@ -1,5 +1,7 @@
 %% based on the upload example packaged with cowboy
 %% @doc Upload handler.
+%% upload new images from client to server/db
+
 -module(upload_handler).
 -export([init/2]).
 
@@ -22,11 +24,16 @@ upload_processor(has_session_cookie, User, Req0) ->
 	{FileData, FileName, FileSize, Adj1, Adj2} = extract_file_and_adjs(Req0),
 	{ok, FileMime} = emagic:from_buffer(FileData), % Mime based on magic numbers
 
+	%erlang:display(FileData),
+	erlang:display(FileName),
+	erlang:display(Adj1),
+	erlang:display(Adj2),
+	erlang:display(FileMime),
+
 	%% check for extension matching mime type, 
 	case file_adj_validator(FileName, FileMime, is_mime_ok(FileMime), Adj1, Adj2) of
 		file_valid ->
 			FileHash = get_hash(crypto:hash(sha, FileData)),
-			erlang:display(FileHash),
 			{FinalFileName, FileNameWithPath, TempFile, ImageUri} = create_file_name(FileName, FileHash),
 			{ResponseBody, ResponseStatus} = file_storage(FileSize, MaxFileSize, FinalFileName, FileNameWithPath, TempFile, FileData, User, ImageUri, Adj1, Adj2),
 			{ResponseBody, ResponseStatus};
@@ -37,7 +44,12 @@ upload_processor(has_session_cookie, User, Req0) ->
 		adj_not_valid  ->
 			ResponseBody = <<"Please enter two adjectives of your choice">>,
 			ResponseStatus = 415,
+			{ResponseBody, ResponseStatus};
+		other_error  ->
+			ResponseBody = <<"There was an unknown error. Please try again">>,
+			ResponseStatus = 415,
 			{ResponseBody, ResponseStatus}
+
 	end;
 
 upload_processor(_, _, _) ->
@@ -48,21 +60,25 @@ upload_processor(_, _, _) ->
 %%check mime type and file extension and if they match
 %%file_adj_validator(FileName, FileMime, is_mime_ok(FileMime), Adj1, Adj2) 
 file_adj_validator(_, _, _, <<>>, _Adj2) ->
+	erlang:display(adj1notvalid),
 	adj_not_valid;
 file_adj_validator(_, _, _, _Adj1, <<>>) ->
+	erlang:display(adj2notvalid),
 	adj_not_valid;
 file_adj_validator(FileName, FileMime, mime_is_ok, _, _) ->
 	[_, FileExt] = binary:split(filename:extension(FileName), <<".">>),
 	[_, MimeExt] = binary:split(FileMime, <<"/">>),
 
-	case extension_match(MimeExt, FileExt) of 
+	case extension_match(MimeExt, string:lowercase(FileExt)) of 
 		true ->
 			file_valid;
 		false ->
 			file_not_valid
 	end;
+file_adj_validator(_FileName, _FileMime, mime_not_ok, _, _) ->
+	file_not_valid;
 file_adj_validator(_, _, _, _Adj1, _Adj2) ->
-	file_not_valid.
+	other_error.
 
 %%check if the extension of filename matches that derived from magic mimetype 
 extension_match(<<"jpeg">>, <<"jpg">>) ->
@@ -84,37 +100,37 @@ is_mime_ok(Mime) ->
 extract_file_and_adjs(Req) ->
 	{ok, Headers, Req2} = cowboy_req:read_part(Req),
 	
-	%Data0 is the file data
+	%DataFile is the file data
 	%erlang:display(cowboy_req:read_part_body(Req2)),
-	{ok, Data0, Req3} = cowboy_req:read_part_body(Req2),
-	%io:format("DATA0 ~n ~p~n", [Data0]),
+	{ok, DataFile, Req3} = cowboy_req:read_part_body(Req2),
+	%io:format("DATA0 ~n ~p~n", [DataFile]),
 
-	{file, <<"inputfile">>, FileName, FileSize} = case Data0 == <<"undefined">> of
+	{file, <<"inputfile">>, FileName, FileSize} = case DataFile == <<"undefined">> of
 		true ->
 			{file, <<"inputfile">>, file_name, foo};
 		false ->
-			FileSize1 = byte_size(Data0),
+			FileSize1 = byte_size(DataFile),
 			%erlang:display(cow_multipart:form_data(Headers)),
 			{file, <<"inputfile">>, FileName1, _} = cow_multipart:form_data(Headers),
 			{file, <<"inputfile">>, FileName1, FileSize1}
 	end,
 
-%	FileSize = byte_size(Data0),
+%	FileSize = byte_size(DataFile),
 %	erlang:display(cow_multipart:form_data(Headers)),
 %	{file, <<"inputfile">>, FileName, _} = cow_multipart:form_data(Headers),
 %	erlang:display(FileName),
 
 %add checks to be sure Headers are what they should be. prevent tampered requests. 
 	{ok, _Headers1, Req4} = cowboy_req:read_part(Req3),
-	{ok, Data1, Req5} = cowboy_req:read_part_body(Req4),
+	{ok, DataAdj1, Req5} = cowboy_req:read_part_body(Req4),
 
 	{ok, _Headers2, Req6} = cowboy_req:read_part(Req5),
-	{ok, Data2, _Req7} = cowboy_req:read_part_body(Req6),
+	{ok, DataAdj2, _Req7} = cowboy_req:read_part_body(Req6),
 
 %	{ok, Headers3, Req8} = cowboy_req:read_part(Req7),
 %	{ok, Data3, Req9} = cowboy_req:read_part_body(Req8),
 
-	{Data0, FileName, FileSize, Data1, Data2}.
+	{DataFile, FileName, FileSize, DataAdj1, DataAdj2}.
 
 %%get hash and convert it to printable ascii
 %%https://gist.github.com/dch/bb33330a6d68b8149103

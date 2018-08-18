@@ -54,6 +54,8 @@ escape_html([?QUOTE | Rest], Acc) ->
 escape_html([C | Rest], Acc) ->
     escape_html(Rest, [C | Acc]).
 
+%%include html unescaping function? based on mochiweb_charref.erl
+
 %%to do: html attribute escaping function. based on above.
 %%not done because all current attributes are predefined/hardcoded. 
 

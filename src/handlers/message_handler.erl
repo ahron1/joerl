@@ -5,14 +5,11 @@
 
 %%to do: add new funs to check req body to send ERRONEOUS REQ like in login handler
 %%to do later: abstract above into new module
-%%
-%%to do: save message to db. 
 
 init(Req0, Opts) ->
 
 	{_CookieStatus, _User} = entry_helpers:check_session_cookie(Req0),
 %% remove cookie status check in both erl and js - anyone can send message. 
-%% use this format - both erl and js - for uploads. 
 
 %	case CookieStatus of
 %		has_no_session_cookie ->
@@ -21,15 +18,15 @@ init(Req0, Opts) ->
 %			{ResponseBody, ResponseStatus};
 %		has_session_cookie ->
 			{SenderName, SenderEmail, MessageContent} = extract_message_contents(Req0),
-			io:format("~nSender's Name ~n~p~n", [SenderName]),
-			io:format("Sender's Email ~n~p~n", [SenderEmail]),
-			io:format("Message ~n~p~n", [MessageContent]),
-			%might need to check message contents first. for security. 
-			%db_helpers:store_message(User, SenderName, SenderEmail, MessageContent),
-%			ResponseBody = <<"Message received by server">>,
-			%only for testing - send back received mesasge to display on client screen
-			ResponseBody = general_helpers:escape_html(MessageContent),
-			io:format("Message ~n~p~n", [ResponseBody]),
+			
+			MessageContentCleaned = general_helpers:escape_html(MessageContent),
+			SenderNameCleaned = general_helpers:escape_html(SenderName),
+			_SenderEmailCleaned = general_helpers:escape_html(SenderEmail),
+			email_helper:send(binary:bin_to_list(SenderNameCleaned), binary:bin_to_list(SenderEmail), binary:bin_to_list(MessageContentCleaned)),
+
+			erlang:display(MessageContentCleaned),
+
+			ResponseBody = <<"Thank you for your message! We will read it shortly.">>,
 			ResponseStatus = 200,
 			%{ResponseBody, ResponseStatus},
 %	end,
@@ -37,7 +34,6 @@ init(Req0, Opts) ->
 		<<"content-type">> => <<"text/html">>
 		}, ResponseBody, Req0),
 		{ok, Req, Opts}.
-
 
 %%extract the File data, file name and adjectives from incoming req
 extract_message_contents(Req) ->

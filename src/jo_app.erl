@@ -25,7 +25,7 @@ make_dispatch() ->
 							 ,{"/uploadhandler", upload_handler, []}
 							 ,{"/messagehandler", message_handler, []}
 							 ,{"/imagehandler", image_handler, []}
-							 ,{"/voteshandler", vote_handler, []}
+							 ,{"/voteshandler", votes_handler, []}
 							 ,{"/join/[:join_token]", join_handler, []}
 							 ,{"/resetpassword/[:pw_token]", pw_reset_handler, []}
 							 ,{"/activateaccount/[:activation_token]", account_activate_handler, []}

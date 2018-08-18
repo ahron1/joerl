@@ -1,4 +1,6 @@
 %% @doc Image handler.
+%% send new image(s) to client
+
 -module(image_handler).
 -export([init/2]).
 
@@ -26,7 +28,7 @@ send_image(WhichImage, has_session_cookie, User) when ((WhichImage == <<>>) or (
 send_image(WhichImage, has_session_cookie, User) ->
 	[<<>>, ThisImage] = binary:split(WhichImage, [<<"/images/">>]),
 	ThisImageId = erlang:list_to_integer(erlang:binary_to_list(ThisImage)),
-	erlang:display(ThisImageId),
+	%erlang:display(ThisImageId),
 	ImageInfo = db_helpers:get_this_pic(ThisImageId),
 	NextImagesInfo = db_helpers:get_new_pics(User),
 	ImagesToSendInfo = lists:append(ImageInfo, NextImagesInfo),

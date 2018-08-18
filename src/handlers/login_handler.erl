@@ -29,7 +29,7 @@ set_reply_values(OriginalRequest, _, _) ->
 %%check login details, return http status, and set a cookie if okay. 
 check_in(OriginalRequest) ->
 	{FormLogin, FormPassword} = entry_helpers:extract_login_pw(OriginalRequest),
-%%	receiving json data and extracting info from it
+%%	NOT USED ANYMORE receiving json data and extracting info from it
 %	{ok, Data, _} = cowboy_req:read_body(OriginalRequest),
 %	erlang:display(data),
 %	io:format("~p~n", [Data]),
@@ -55,17 +55,7 @@ set_cookie(StoredPassword, Id, FormPassword, OriginalRequest) ->
 	%%todo: hash/salt pw in db and check user pw directly in db, not in server code. or hash form pw and compare with stored hash. 
 	case StoredPassword =:= FormPassword of
 		true ->
-			% first check if db already has a valid cookie 
-			% for the case where user closed browser window and lost valid cookie
-			{N, ExistingCookieTupleList} = db_helpers:cookie_given_id(Id),
-			NewCookieValue = case N of 
-				1 -> 
-					[{ExistingCookie}] = ExistingCookieTupleList,
-					ExistingCookie;
-				_ -> 
-					% if valid cookie doesn't exist, make new
-					db_helpers:create_session_cookie(Id)
-			end,
+			NewCookieValue = db_helpers:create_session_cookie(Id),
 			%after cookie has gotten a value (new/old) procees with Req
 			Req1 = cowboy_req:set_resp_cookie(<<"session">>, NewCookieValue, OriginalRequest, #{path => <<"/">>, http_only => true, secure => true}),
 			{<<"WELCOME">>, 200, Req1};

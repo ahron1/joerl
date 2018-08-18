@@ -238,22 +238,22 @@ image_details_to_db(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
 		   insert into adjective_to_picture_property(property_of, coupled_by) 
 		   select id, (select id from userid) from a2p2
 		   )
-	  	   ,a2a_new as (
-		   insert into adjective_to_adjective(source, target)
-		   values ( 
-				(select property_of from w1 union all select property_of from ap1) 
-				,(select property_of from w2 union all select property_of from ap2)
-				)
-		   on conflict  
-		   do nothing 
-		   returning source, target, id
-		   )
-		   ,a2ap as ( 
-		   insert into adjective_to_adjective_property (property_of, is_pair)
-		   select id, 'true' from a2a_new
-		   where exists (select 1 from a2a_new) 
-		   returning id, property_of
-		   )
+--	  	   ,a2a_new as (
+--		   insert into adjective_to_adjective(source, target)
+--		   values ( 
+--				(select property_of from w1 union all select property_of from ap1) 
+--				,(select property_of from w2 union all select property_of from ap2)
+--				)
+--		   on conflict  
+--		   do nothing 
+--		   returning source, target, id
+--		   )
+--		   ,a2ap as ( 
+--		   insert into adjective_to_adjective_property (property_of, is_pair)
+--		   select id, 'true' from a2a_new
+--		   where exists (select 1 from a2a_new) 
+--		   returning id, property_of
+--		   )
 		   ,person2a1 as ( 
 		   insert into person_to_adjective(source, target) 
 		   select (select id from userid), property_of from ap1
@@ -313,21 +313,49 @@ image_details_to_db(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
 	", [UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2]),
 	{NewImageId, Adj1Text, Adj2Text}.
 
-%% get list of next 10 pics (with adjectives) not seen by given user
+%% get list of next 5 pics (with adjectives) not seen by given user
 get_new_pics(UserId) ->
 	{{select, _N}, ImgAdjTupleList} = pp_db:extended_query("
-		with 
-	    userid as ( 
-	    select ($1::int) as id
-	    )
-		,p as (
-		select target from person_to_picture
-		where source = (select id from userid)
-		)    
-   	   select *
-  	   from pic_adj_adj
-  	   where pic_adj_adj.picture not in (select target from p)
-  	   fetch first 5 rows only
+	with 
+		person as (
+		select ($1::int) as id
+		)
+		,adjs_temp as (
+		select w1_adj, w1_prop, w2_adj, w2_prop--, row_number() over (order by w1_prop) 
+		from adj_pair_list
+		order by random()
+		limit 5
+		)
+		,pics_temp as (
+		select picture_uri, property_of as pic_id--, row_number() over (order by picture_uri) 
+		from picture_property
+		where property_of <> all (
+			(select pics from person_property_session 
+			where property_of = (select id from person))::int[])
+		order by random()
+		limit 5
+		)
+		,adjs as (
+		select w1_adj, w1_prop, w2_adj, w2_prop, row_number() over (order by w1_prop) 
+		from adjs_temp
+		)
+		,pics as (
+		select picture_uri, pic_id, row_number() over (order by pic_id) 
+		from pics_temp
+		)
+		,paa as (
+		select  pic_id, w1_adj, w1_prop, w2_adj, w2_prop, picture_uri
+		from pics as xx
+		join 
+		adjs as yy
+		on xx.row_number = yy.row_number
+		)
+		,sessionpics as (
+		update person_property_session 
+		set pics =  pics || (select array_agg(pic_id) from paa)
+		where (property_of = (select id from person))
+		)
+	select * from paa
 	", [UserId]),
 	%erlang:display(ImgAdjTupleList),
 	ImgAdjTupleList.
@@ -335,9 +363,39 @@ get_new_pics(UserId) ->
 %% get details of one specific pic
 get_this_pic(PicId) ->
 	{{select, _N}, ImgAdjTupleList} = pp_db:extended_query("
-   	   select *
-  	   from pic_adj_adj
-  	   where pic_adj_adj.picture = $1::int
+	with 
+		picid as ( --get from client/server code
+		select ($1::int) as id
+		)
+		,adjs_temp as (
+		select w1_adj, w1_prop, w2_adj, w2_prop--, row_number() over (order by w1_prop) 
+		from adj_pair_list
+		order by random()
+		limit 1
+		)
+		,pics_temp as (
+		select picture_uri, property_of as pic_id--, row_number() over (order by picture_uri) 
+		from picture_property
+		where property_of = (select id from picid)
+		order by random()
+		limit 1
+		)
+		,adjs as (
+		select w1_adj, w1_prop, w2_adj, w2_prop, row_number() over (order by w1_prop) 
+		from adjs_temp
+		)
+		,pics as (
+		select picture_uri, pic_id, row_number() over (order by pic_id) 
+		from pics_temp
+		)
+		,paa as (
+		select  pic_id, w1_adj, w1_prop, w2_adj, w2_prop, picture_uri
+		from pics as xx
+		join 
+		adjs as yy
+		on xx.row_number = yy.row_number
+		)
+	select * from paa
 	", [PicId]),
 	%erlang:display(ImgAdjTupleList),
 	ImgAdjTupleList.
@@ -400,7 +458,7 @@ record_votes(Adj1, Adj2, VoteChoice, PicId, UserId) ->
 %	ImgAdjTupleList.
 
 % %% maintenance and updates
-%% materialized view
+%% materialized view pic_adj_adj
 %{{select, _N}, []} = 
 materialized_view(create, pic_adj_adj) ->
 	pp_db:simple_query(" 
@@ -456,9 +514,6 @@ update_vetted_adj() ->
 				)
 			select y from x
 		").
-
-%% store message to server. 
-%store_message(User, SenderName, SenderEmail, MessageContent) ->
 
 %if it is necessary to use quoted column names escape the quotes as below:
 %{{select,N}, UserId} = pp_db:extended_query("select \"userid\" from cookietable where value = $1", [Cookie]),
