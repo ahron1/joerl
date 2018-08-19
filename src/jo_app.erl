@@ -21,7 +21,8 @@ start(_Type, _Args) ->
 
 make_dispatch() ->
 	cowboy_router:compile([
-					  {'_', [{"/login", login_handler, []} 
+					   {'_', [{"/login", login_handler, []} 
+							 ,{"/logout", logout_handler, []}
 							 ,{"/uploadhandler", upload_handler, []}
 							 ,{"/messagehandler", message_handler, []}
 							 ,{"/imagehandler", image_handler, []}
