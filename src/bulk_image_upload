@@ -1,0 +1,5 @@
+1. login and get session cookie value. 
+2. enter dir where images are stored.
+3. use something like below
+
+find . -type f -exec curl -k -b "session=dff48d69979740868f418ac63d2d9e974f70d0db93793937ed36ace95005a521" -F inputfile=@{} -F adj1="foo" -F adj2="bar"  https://192.168.64.2/uploadhandler \;
