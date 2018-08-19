@@ -58,6 +58,7 @@ set_cookie(StoredPassword, Id, FormPassword, OriginalRequest) ->
 			NewCookieValue = db_helpers:create_session_cookie(Id),
 			%after cookie has gotten a value (new/old) procees with Req
 			Req1 = cowboy_req:set_resp_cookie(<<"session">>, NewCookieValue, OriginalRequest, #{path => <<"/">>, http_only => true, secure => true}),
+			ok = db_helpers:log_signin(Id, NewCookieValue),
 			{<<"WELCOME">>, 200, Req1};
 		false ->
 			{<<"wrong password">>, 400, OriginalRequest}

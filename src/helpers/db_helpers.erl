@@ -1,7 +1,7 @@
 -module(db_helpers).
 
 -export([activation_given_login/1, new_account_creation/1, id_given_signup_token/1, activate_new_account/1]). 
--export([id_pw_given_login/1, check_session_cookie/1, create_session_cookie/1, delete_session_cookie/1, cookie_given_id/1]). 
+-export([id_pw_given_login/1, check_session_cookie/1, create_session_cookie/1, delete_session_cookie/1, cookie_given_id/1, log_signin/2, log_signout/1]). 
 -export([create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1]).
 -export([image_details_to_db/6, get_new_pics/1, get_this_pic/1, record_votes/5]).
 -export([materialized_view/2, update_vetted_adj/0]).
@@ -69,7 +69,7 @@ cookie_given_id(Id) ->
 	%update last update timestamp if cookie exists
 	case N of 
 		1 -> 
-			pp_db:extended_query("update person_property_session set time_of_last_update = CURRENT_TIMESTAMP where property_of=$1", [Id]);
+			{{update, 1}, _} = pp_db:extended_query("update person_property_session set time_of_last_update = CURRENT_TIMESTAMP where property_of=$1", [Id]);
 		_ ->
 			no_ongoing_session
 	end,
@@ -101,6 +101,16 @@ create_session_cookie(Id) ->
 %% delete session cookie given Id
 delete_session_cookie(Id) ->
 	{{delete, _}, _} = pp_db:extended_query("delete from person_property_session where property_of=$1", [Id]).
+
+%%create new log entry for user sign in
+log_signin(UserId, Cookie) ->
+	{{insert, 1}, _} = pp_db:extended_query("insert into person_property_session_log(property_of, session_id) values($1, $2) returning id",[UserId, Cookie]),
+	ok.
+
+%%update log entry for user sign out
+log_signout(SessionId) ->
+	{{update, 1}, _} = pp_db:extended_query("update person_property_session_log set logout_timestamp = CURRENT_TIMESTAMP where session_id = $1", [SessionId]),
+	ok.
 
 % %% password reset
 %%insert new token for resetting pasword

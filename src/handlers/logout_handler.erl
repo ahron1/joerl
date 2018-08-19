@@ -17,6 +17,8 @@ set_reply_values(OriginalRequest, has_no_session_cookie, _UserId) ->
 set_reply_values(OriginalRequest, has_session_cookie, UserId) ->
 	erlang:display(ongoing_session_will_sign_out),
 	%Has cookie with value matching key 'session' = ongoing session 
+	{1, [{CookieValue}]} = db_helpers:cookie_given_id(UserId),
+	ok = db_helpers:log_signout(CookieValue),
 	{{delete, 1}, _} = db_helpers:delete_session_cookie(UserId),
 	{<<"See you later!">>, 200, OriginalRequest};
 set_reply_values(OriginalRequest, _, _UserId) ->
