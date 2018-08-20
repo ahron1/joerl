@@ -1,7 +1,7 @@
 -module(db_helpers).
 
--export([activation_given_login/1, new_account_creation/1, id_given_signup_token/1, activate_new_account/1]). 
--export([id_pw_given_login/1, check_session_cookie/1, create_session_cookie/1, delete_session_cookie/1, cookie_given_id/1, log_signin/2, log_signout/1]). 
+-export([id_given_login_pw/2, activation_given_login/1, new_account_creation/1, id_given_signup_token/1, activate_new_account/1]). 
+-export([check_session_cookie/1, create_session_cookie/1, delete_session_cookie/1, cookie_given_id/1, log_signin/2, log_signout/1]). 
 -export([create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1]).
 -export([image_details_to_db/6, get_new_pics/1, get_this_pic/1, record_votes/5]).
 -export([materialized_view/2, update_vetted_adj/0]).
@@ -11,10 +11,10 @@
 %% consolidate activation_given_login and id_pw_given_login (rename to credentials_given_login?), here and in all caller funs; move has_active_account into entry_helper. ??
 
 % %% account/id/pw
-%% get the stored password from the database given the submitted login
-id_pw_given_login(FormLogin) ->
-	{{select,N}, IdPwTupleList} = pp_db:extended_query("select property_of, password_text from person_property_credentials where email = $1 and is_account_active = true", [FormLogin]),
-	{{select,N}, IdPwTupleList}.
+%%get user id given submitted id/pw for logging in
+id_given_login_pw(FormLogin, FormPassword) ->
+	{{select, N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_credentials where email=$1 and password_text=crypt($2, password_text)", [FormLogin, FormPassword]),
+	{{select, N}, IdTupleList}.
 
 %% get account activation status from the database given the submitted login
 activation_given_login(FormLogin) ->

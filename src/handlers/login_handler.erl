@@ -29,38 +29,25 @@ set_reply_values(OriginalRequest, _, _) ->
 %%check login details, return http status, and set a cookie if okay. 
 check_in(OriginalRequest) ->
 	{FormLogin, FormPassword} = entry_helpers:extract_login_pw(OriginalRequest),
-%%	NOT USED ANYMORE receiving json data and extracting info from it
-%	{ok, Data, _} = cowboy_req:read_body(OriginalRequest),
-%	erlang:display(data),
-%	io:format("~p~n", [Data]),
-%	%extract login and pw via pattern matching from decoded post data in req 
-%	{struct, [{<<"login">>, FormLogin},{<<"password">>,FormPassword}]} = mochijson2:decode(Data),
-
-	%get stored password from db and number of rows matching the given login
-	{{select,N}, IdPwTupleList} = db_helpers:id_pw_given_login(FormLogin),
-	erlang:display(IdPwTupleList),
+	%get user id from db and if the given login/pw are a match
+	{{select,N}, IdTupleList} = db_helpers:id_given_login_pw(FormLogin, FormPassword),
+	erlang:display(IdTupleList),
 	% case on number of rows returned by the query
-	% todo bring password check to this module.
 	case N of
 		1 -> 
-			[{Id, StoredPassword}] = IdPwTupleList,
-			set_cookie(StoredPassword, Id, FormPassword, OriginalRequest);
+			[{Id}] = IdTupleList,
+			set_cookie(Id, OriginalRequest);
 		_ -> 
-			{<<"USERNAMES ERROR">>, 400, OriginalRequest}
+			{<<"Erroneous login and/or password. Please check.">>, 400, OriginalRequest}
 	end.
 
-%%set cookie with key 'session' if password matches
-set_cookie(StoredPassword, Id, FormPassword, OriginalRequest) ->
+%%set cookie with key 'session' 
+set_cookie(Id, OriginalRequest) ->
 	% todo move password check to previous module.?
 	%%todo: hash/salt pw in db and check user pw directly in db, not in server code. or hash form pw and compare with stored hash. 
-	case StoredPassword =:= FormPassword of
-		true ->
-			NewCookieValue = db_helpers:create_session_cookie(Id),
-			%after cookie has gotten a value (new/old) procees with Req
-			Req1 = cowboy_req:set_resp_cookie(<<"session">>, NewCookieValue, OriginalRequest, #{path => <<"/">>, http_only => true, secure => true}),
-			ok = db_helpers:log_signin(Id, NewCookieValue),
-			{<<"WELCOME">>, 200, Req1};
-		false ->
-			{<<"wrong password">>, 400, OriginalRequest}
-	end.
+		NewCookieValue = db_helpers:create_session_cookie(Id),
+		%after cookie has gotten a value (new/old) procees with Req
+		Req1 = cowboy_req:set_resp_cookie(<<"session">>, NewCookieValue, OriginalRequest, #{path => <<"/">>, http_only => true, secure => true}),
+		ok = db_helpers:log_signin(Id, NewCookieValue),
+		{<<"WELCOME">>, 200, Req1}.
 
