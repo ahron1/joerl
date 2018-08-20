@@ -1,6 +1,6 @@
 -module(db_helpers).
 
--export([id_given_login_pw/2, activation_given_login/1, new_account_creation/1, id_given_signup_token/1, activate_new_account/1]). 
+-export([id_given_login_pw/2, id_given_login/1, name_given_id/1, activation_given_login/1, new_account_creation/1, id_given_signup_token/1, activate_new_account/1]). 
 -export([check_session_cookie/1, create_session_cookie/1, delete_session_cookie/1, cookie_given_id/1, log_signin/2, log_signout/1]). 
 -export([create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1]).
 -export([image_details_to_db/6, get_new_pics/1, get_this_pic/1, record_votes/5]).
@@ -15,6 +15,17 @@
 id_given_login_pw(FormLogin, FormPassword) ->
 	{{select, N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_credentials where email=$1 and password_text=crypt($2, password_text)", [FormLogin, FormPassword]),
 	{{select, N}, IdTupleList}.
+
+%%get user id given submitted login id (check if login id is valid)
+id_given_login(FormLogin) ->
+	{{select, N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_credentials where email=$1", [FormLogin]),
+	{{select, N}, IdTupleList}.
+
+%%get user name given id
+name_given_id(Id) -> 
+	{{select, 1}, NameTupleList} = pp_db:extended_query("select name from person_property where property_of = $1", [Id]),
+	[{Name}] = NameTupleList,
+	Name. 
 
 %% get account activation status from the database given the submitted login
 activation_given_login(FormLogin) ->
@@ -133,7 +144,7 @@ id_given_valid_pw_token(Token) ->
 
 %%update password given login
 update_pw(Id, NewPassword) ->
-	{{update, 1}, _} = pp_db:extended_query("update person_property_credentials set password_text = $1 where property_of=$2", [NewPassword, Id]).
+	{{update, 1}, _} = pp_db:extended_query("update person_property_credentials set password_text = (crypt($1, gen_salt('bf', 8))) where property_of=$2", [NewPassword, Id]).
 
 %%update password given login
 activate_pw_token(Id) ->

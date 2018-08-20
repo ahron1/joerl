@@ -5,7 +5,7 @@
 %% to do: update tokens to work better with nginx. from js hit /forgot/ for new reset req, /new/ for ... so nginx can pattern match for /resetpassword/[0-9a-z]+/ for the token
 init(Req0, State) ->
 	PwToken = cowboy_req:binding(pw_token, Req0),
-	erlang:display(PwToken),
+	%erlang:display(PwToken),
 
 	{Status, Headers, Body} = case PwToken of
 		<<"forgot">> ->
@@ -25,38 +25,34 @@ init(Req0, State) ->
 
 %new reset req. get form elements and create new token based on email
 reset_request(Req0) ->
-	erlang:display(no_token_so_new_req),
+	%erlang:display(no_token_so_new_reset_req),
 	{Login, _Password} = entry_helpers:extract_login_pw(Req0),
-	erlang:display(Login),
-	{{select, N}, IdPwTupleList} = db_helpers:id_pw_given_login(Login),
+	{{select, N}, IdTupleList} = db_helpers:id_given_login(Login),
     H = #{<<"content-type">> => <<"text/plain">>},
 	{S, H, B} = case N of %check if username is valid
 		1 ->
-			%Valid login id, get userid and create entry in tokens table
-			[{Id, _Pw}] = IdPwTupleList,
-			erlang:display(Id),
-			{{insert, 0, 1}, [{TokenValue}]} = db_helpers:create_pw_token(Id),
-			erlang:display(TokenValue),
-%todo: 			%send it to user by mail
+			%Valid login id, so get userid and create entry in tokens table
+			[{Id}] = IdTupleList,
+			{{insert, 1}, [{TokenValue}]} = db_helpers:create_pw_token(Id),
+			email_helper:send_pw_reset_email(TokenValue, Id, Login),
 			{200, H, <<"password change">>}
 			;
 		_ ->
-			{400, H, <<"invalid login">>}
 			%Invalid login. try again
+			{400, H, <<"invalid login">>}
 	end,
 	{S, H, B}.
 
 %receive submitted form with new pw and update db with new pw
 set_new_pw(Req0) ->
-	erlang:display(new_pw_set),
 	{Login, NewPassword} = entry_helpers:extract_login_pw(Req0),
     H0 = #{<<"content-type">> => <<"text/plain">>},
 	% first check if the login is valid
-	{{select,N}, IdPwTupleList} = db_helpers:id_pw_given_login(Login),
+	{{select,N}, IdTupleList} = db_helpers:id_given_login(Login),
 	{S, H, B} = case N of 
 		1 ->
 			%since login is valid, get the id
-			[{Id, _StoredPassword}] = IdPwTupleList,
+			[{Id}] = IdTupleList,
 			%before updating check if the token is still valid. 
 			{{select, N1}, _} = db_helpers:check_valid_pw_token(Id),
 			case N1 of
@@ -86,15 +82,14 @@ set_new_pw(Req0) ->
 %has token, so it is a user clicking the reset link. 
 token_validation(PwToken) ->
 	%check token in db. if valid...
-	erlang:display(has_token_so_old_req),
+	%erlang:display(has_token_so_old_req),
 	%get the id from the token (also checking if token is usable)
 	{{select,N}, IdTupleList} =	db_helpers:id_given_valid_pw_token(PwToken),
     H = #{<<"content-type">> => <<"text/plain">>},
-	%erlang:display(in_pw_r_h_after_db),
 	{S1, H1, B1} = case N of 
 		1 ->
 			[{Id}] = IdTupleList,
-			erlang:display(token_okay),
+			%erlang:display(token_okay),
 			%to do: add code in nginx to return 404 for this location unless referrer matched own domain. ??
 
 			%activate token and send the form
@@ -108,7 +103,7 @@ token_validation(PwToken) ->
 			{200, H_form, Body_form}
 			;
 		_ ->
-			{400, H, <<"invalid token">>}
+			{400, H, <<"This token is invalid, please submit a fresh reset request..">>}
 			% to do: consider sending just a custom 404 instead of a meaningful response to the client, less communicative server is better for security
 	end,
 	{S1, H1, B1}.
@@ -129,7 +124,7 @@ reset_form_body() ->
 				document.getElementById(\"password-reset\").value=\"\";
 				document.getElementById(\"password-reset-email\").value=\"\";
 				if (xhr.status == 200) {
-					window.location.href=\"https://192.168.43.220:8765\";
+					window.location.href=\"https://192.168.64.2\";
 					//alert(\"js alert: password changed. login again\")
 					}
 //				else {
@@ -159,3 +154,4 @@ reset_form_body() ->
 	</body>
 </html>
 ">>.
+
