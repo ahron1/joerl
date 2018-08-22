@@ -15,14 +15,14 @@ init(Req0, Opts) ->
 %%generate response/reply values based on cookie status and body 
 set_reply_values(OriginalRequest, has_no_session_cookie, has_body) ->
 	%No cookie but has body = login req. 
-	erlang:display(login_req),
+	%erlang:display(login_req),
 	check_in(OriginalRequest);
 set_reply_values(OriginalRequest, has_session_cookie, _) ->
-	erlang:display(ongoing_session),
+	%erlang:display(ongoing_session),
 	%Has cookie with value matching key 'session' = ongoing session 
 	{<<"ONGOING SESSION">>, 200, OriginalRequest};
 set_reply_values(OriginalRequest, _, _) ->
-	erlang:display(erroneous_req),
+	%erlang:display(erroneous_req),
 	% No cookie and no body = error
 	{<<"ERRONEOUS REQUEST">>, 400, OriginalRequest}.
 

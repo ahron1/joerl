@@ -16,12 +16,104 @@ init(Req0, State) ->
 	Req = cowboy_req:reply(Status, Headers, Body, Req0),
 	{ok, Req, State}.
 
-%%for a brand new user request, check various conditions and process the request
+%% handle new signup request
+%for a brand new user request, check various conditions and process the request
 new_join_req(Req0) ->
-	{Login, Inviter} = entry_helpers:extract_login_pw_inviter(Req0),
-	{HasActiveAccount, HasSignedUp, IsPreactivatedAccount, IsValidInviter} = get_join_req_details(Login, Inviter),
-	check_and_create_account(HasActiveAccount, HasSignedUp, IsPreactivatedAccount, IsValidInviter, Login, Inviter).
+	{Login, FirstName} = entry_helpers:extract_signup_details(Req0),
+	%{HasAccount, Id} = has_account(Login), 
+	{{select, N}, IdTupleList} = db_helpers:id_given_login(Login),
 
+	process_new_request(N, IdTupleList, Login, FirstName).
+
+%process new account depending on if there already is a db entry
+%for a completely fresh user, just make a new account. 
+process_new_request(0, _, Login, FirstName) ->
+	create_new_account(Login, FirstName);
+
+process_new_request(1, IdTupleList, Login, FirstName) ->
+	%fun to check is_account_active
+	%this gets set to true after the account is activated (by clicking on token)
+	
+	%is in inorganic db - has been invited
+
+	[{Id}] = IdTupleList,
+	AlreadyActive = already_active(Id) % check in ppc is_acc_active
+		IsInvited = is_invited(Id), % check presence in ppa_invited table
+			HasSignedUp = has_signed_up(Id) % check presence in ppa_fresh table, and check waiting period isn't up. 
+				IsWaitingOver = is_waiting_over(Id)
+				TokenGenerated = token_generated(Id)
+					IsTokenExpired = is_token_expired(Id)
+
+
+
+
+
+	%TODO: also update first name based on signup form input.. 
+.
+
+%check join req details and call new account creation if needed.
+%new_account_if_needed(HasAccount, HasSignedUp, IsPreactivatedAccount, Login, ).
+new_account_if_needed(has_account, _, _, _) ->
+	%given login already has active functioning account
+	%todo: use new status code for js redir to homepage/reload
+	{200, #{<<"content-type">> => <<"text/plain">>}, <<"there's already an account for this email. try logging in.">>};
+
+new_account_if_needed(_, has_signed_up, _, _) ->
+	erlang:display(already_on_waiting_list),
+	%todo: use new status code for js redir to homepage/reload
+	{200, #{<<"content-type">> => <<"text/plain">>}, <<"you're already on the waiting list. We'll activate your account ASAP">>};
+
+new_account_if_needed(_, _, IsPreactivatedAccount, Login) ->
+	create_new_account(Login, IsPreactivatedAccount ).
+
+%%actual creation of the account depending on conditions
+%create_new_account(Login, _FirstName, is_preactivated_account) ->
+%	create_new_account(Login),
+%	activate_new_account(login, Login)
+%	use atom login/token in tuple to distinguish direct activation vs activation via emailed url with token
+%	;
+
+create_new_account(Login, FirstName) -> 
+		{{select, N}, NewUserIdTupleList} = db_helpers:new_account_creation(Login),
+		[{NewUserId}] = NewUserIdTupleList,
+		case N of 
+			1 ->
+				%%todo: token will be created and sent when waiting period is over. via periodic script/cron job that checks for waiting period. for now it is done directly here. 
+				{{select, N}, TokenTupleList} = db_helpers:create_signup_token(NewUserId),
+				[{TokenValue}] = TokenTupleList,
+
+				% todo ---- 
+				% create email body (Token, Login, FirstName)
+				% send email.
+				%email_helper:
+				%db_helpers:signup_token_sent_date(NewUserId),
+
+				{200, #{<<"content-type">> => <<"text/plain">>}, <<"successfully signed up. please check email">>};
+
+			_ ->
+				{400, #{<<"content-type">> => <<"text/plain">>}, <<"there was a problem signing up. please try again">>}
+		end.
+
+%% compose and send mail with new token value and link
+% write a file containing the token value and a simple message to click on link
+compose_token_email(FileName, TokenValue) ->
+	FileName = "/usr/home/yc/vm_shared_dir/temp/mailer/out",
+	{ok, WriteHandle} = file:open(FileName, write),
+	io:format(WriteHandle, "Hello, ~n~nPlease click on the following link to activate your account: https://192.168.43.220:8765/join/~s", [TokenValue]),
+	% consider opening file in raw mode and using file:write (faster)
+	erlang:display(mail_composed),
+	ok = file:close(WriteHandle).
+
+% send the file containing the token value to the submitted login email
+send_token_email(FileName, Login) ->
+	%ssmtp receiver@email.com < filename
+	NewLogin = binary:bin_to_list(Login),
+	S = io_lib:format("ssmtp ~p < ~p", [NewLogin, FileName]),
+	[] = os:cmd(S),
+	erlang:display(mail_sent),
+	ok.
+
+%% process token
 %the url contains a token, check if it is valid. (if user doesn't have account??) call variously defined fun to process further (activate account)
 %todo: send html form to enter password (pre-entered email id) if token is valid. as in pw reset. hide pw field in signup form. 
 process_token(JoinToken) ->
@@ -35,131 +127,6 @@ process_token(JoinToken) ->
 			erlang:display(invalid_token),
 			{200, #{<<"content-type">> => <<"text/plain">>}, <<"invalid token">>}
 	end.
-
-%get details about account status and inviter status 
-get_join_req_details(Login, Inviter) ->
-	{{select,N}, ActivationTupleList} = db_helpers:activation_given_login(Login),
-
-	HasActiveAccount = has_active_account(N, ActivationTupleList), %this gets set to true when the account is activated (by clicking on token)
-	HasSignedUp = has_signed_up(N, ActivationTupleList), % this is set to true when the user signs up
-	IsPreactivatedAccount = is_preactivated_account(N, ActivationTupleList), %Preactivated account is one that was originally invited by the system. 
-	IsValidInviter = is_valid_inviter(Inviter), 
-
-	{HasActiveAccount, HasSignedUp, IsPreactivatedAccount, IsValidInviter}.
-
-%check join req details and create new account
-%check_and_create_account(HasActiveAccount, HasSignedUp, IsPreactivatedAccount, IsValidInviter, Login, Inviter).
-check_and_create_account(has_active_account, _, _, _, _, _) ->
-	%given login already has active functioning account
-	%todo: use new status code for js redir to homepage/reload
-	{200, #{<<"content-type">> => <<"text/plain">>}, <<"there's already an account for this email. try logging in.">>};
-
-check_and_create_account(_, has_signed_up, _, _, _, _) ->
-	erlang:display(already_on_waiting_list),
-	%todo: use new status code for js redir to homepage/reload
-	{200, #{<<"content-type">> => <<"text/plain">>}, <<"you're already on the waiting list. We'll activate your account ASAP">>};
-
-check_and_create_account(_, _, IsPreactivatedAccount, IsValidInviter, Login, Inviter) ->
-	create_new_account(Login, Inviter, IsPreactivatedAccount, IsValidInviter).
-
-%%actual creation of the account depending on conditions
-%create_new_account(Login, Inviter, IsPreactivatedAccount, IsValidInviter)
-%create_new_account(Login, _, is_preactivated_account, _) ->
-%	create_new_account(Login),
-%	activate_new_account(login, Login)
-%	use atom login/token in tuple to distinguish direct activation vs activation via emailed url with token
-%	;
-
-%create_new_account(Login, Inviter, IsPreactivatedAccount, IsValidInviter)
-%create_new_account(Login, Inviter, _, is_valid_inviter) -> 
-%	create_new_account(Login),
-%	;
-
-%create_new_account(Login, Inviter, IsPreactivatedAccount, IsValidInviter)
-create_new_account(Login, _, _, _) -> 
-		erlang:display(new_acc_creation_req),
-		{{select, N}, TokenTupleList} = db_helpers:new_account_creation(Login),
-		case N of
-			1 ->
-				erlang:display(TokenTupleList),
-				[{TokenValue}] = TokenTupleList,
-				FileName = "/usr/home/yc/vm_shared_dir/temp/mailer/out",
-				ok = compose_token_email(FileName, TokenValue),
-				ok = send_token_email(FileName, Login),
-				% todo: send confirmation email. (later) send email with token. 
-				{200, #{<<"content-type">> => <<"text/plain">>}, <<"successfully signed up. please check email">>};
-			_ ->
-				{400, #{<<"content-type">> => <<"text/plain">>}, <<"there was a problem signing up. please try again">>}
-		end
-		.
-
-%% write a file containing the token value and a simple message to click on link
-compose_token_email(FileName, TokenValue) ->
-	FileName = "/usr/home/yc/vm_shared_dir/temp/mailer/out",
-	{ok, WriteHandle} = file:open(FileName, write),
-	io:format(WriteHandle, "Hello, ~n~nPlease click on the following link to activate your account: https://192.168.43.220:8765/join/~s", [TokenValue]),
-	% consider opening file in raw mode and using file:write (faster)
-	erlang:display(mail_composed),
-	ok = file:close(WriteHandle).
-
-%% send the file containing the token value to the submitted login email
-send_token_email(FileName, Login) ->
-	%ssmtp receiver@email.com < filename
-	NewLogin = binary:bin_to_list(Login),
-	S = io_lib:format("ssmtp ~p < ~p", [NewLogin, FileName]),
-	[] = os:cmd(S),
-	erlang:display(mail_sent),
-	ok.
-
-%check if inviter email is valid (inviter has active account)
-is_valid_inviter(Inviter) ->
-	erlang:display(in_is_valid_inviter),
-	{{select,N}, ActivationTupleList1} = db_helpers:activation_given_login(Inviter),
-	erlang:display(after_query),
-	erlang:display(ActivationTupleList1),
-	HasActiveAccount = has_active_account(N, ActivationTupleList1),
-	case HasActiveAccount of
-		true ->
-			is_valid_inviter;
-		_ ->
-			is_not_valid_inviter
-	end.
-
-%has_active_account(N, ActivationTupleList) --- return atom
-has_active_account(1, ActivationTupleList) ->
-	[{_Id, IsAccountActive, _IsPreactivatedAccount, _HasSignedUp}] = ActivationTupleList,
-	case IsAccountActive of 
-		true ->
-			has_active_account;
-		_ ->
-			has_no_active_account
-	end;
-has_active_account(_, _) ->
-	has_no_active_account.
-
-%has_signed_up(N, ActivationTupleList) --- return atom
-has_signed_up(1, ActivationTupleList) ->
-	[{_Id, _IsAccountActive, _IsPreactivatedAccount, HasSignedUp}] = ActivationTupleList,
-	case HasSignedUp of 
-		true ->
-			has_signed_up;
-		_ ->
-			has_not_signed_up
-	end;
-has_signed_up(_, _) ->
-	has_not_signed_up.
-
-%check if account is preactivated (i.e. invited by system)
-is_preactivated_account(1, ActivationTupleList) ->
-	[{_Id, _IsAccountActive, IsPreactivatedAccount, _HasSignedUp}] = ActivationTupleList,
-	case IsPreactivatedAccount of 
-		true ->
-			is_preactivated_account;
-		_ ->
-			is_not_preactivated_account
-	end;
-is_preactivated_account(_, _) ->
-	is_not_preactivated_account.
 
 %% check if the signup token is activated and return atom
 is_token_activated(IsTokenActivated) ->

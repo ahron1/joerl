@@ -1,14 +1,10 @@
 -module(db_helpers).
 
--export([id_given_login_pw/2, id_given_login/1, name_given_id/1, activation_given_login/1, new_account_creation/1, id_given_signup_token/1, activate_new_account/1]). 
--export([check_session_cookie/1, create_session_cookie/1, delete_session_cookie/1, cookie_given_id/1, log_signin/2, log_signout/1]). 
+-export([id_given_login_pw/2, id_given_login/1, name_given_id/1, active_status_given_login/1, new_account_creation/2, signup_token_creation/1, signup_token_sent_date/1, id_given_signup_token/1, activate_new_account/1]). 
+-export([id_given_cookie/1, create_session_cookie/1, delete_session_cookie/1, cookie_given_id/1, log_signin/2, log_signout/1]). 
 -export([create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1]).
 -export([image_details_to_db/6, get_new_pics/1, get_this_pic/1, record_votes/5]).
--export([materialized_view/2, update_vetted_adj/0]).
-
-%% add is_account_active to id/pw/queries
-%% hash pw, and check pw directly in db.
-%% consolidate activation_given_login and id_pw_given_login (rename to credentials_given_login?), here and in all caller funs; move has_active_account into entry_helper. ??
+-export([update_vetted_adj/0]).
 
 % %% account/id/pw
 %%get user id given submitted id/pw for logging in
@@ -28,15 +24,14 @@ name_given_id(Id) ->
 	Name. 
 
 %% get account activation status from the database given the submitted login
-activation_given_login(FormLogin) ->
-	erlang:display(in_activation_given_form_login),
-	{{select,N}, ActivationTupleList} = pp_db:extended_query("select property_of, is_account_active, is_account_preactivated, has_signed_up from person_property_credentials where email = $1", [FormLogin]),
-	erlang:display(after_query_db_helpers),
-	{{select,N}, ActivationTupleList}.
+active_status_given_login(FormLogin) ->
+	{{select,N}, ActiveStatusTupleList} = pp_db:extended_query("select is_account_active from person_property_credentials where email = $1", [FormLogin]),
+	{{select,N}, ActiveStatusTupleList}.
 
-%% new (inactive) account creation using given login/pw
-new_account_creation(Login) ->
-	{{select, 1}, TokenTupleList} = pp_db:extended_query("
+%% new (inactive) account creation using given login/name
+%% adjust hardcoded value in last expression to change waiting time
+new_account_creation(Login, Name) ->
+	{{select, N}, NewUserIdTupleList} = pp_db:extended_query("
 		with 
 			person as (
 			insert into person 
@@ -44,32 +39,54 @@ new_account_creation(Login) ->
 			returning id
 		    )
  		    ,person_property as (
-			insert into person_property (property_of) 
-			select id from person 
+			insert into person_property (property_of, name) 
+			select id, (select $2) from person 
 			returning id
 			)
 			,person_property_credentials as (
-			insert into person_property_credentials (property_of, email, has_signed_up) 
-			select id, (select $1), true from person
+			insert into person_property_credentials (property_of, email) 
+			select id, (select $1) from person
 			returning id
 			)
-			,person_property_signup_tokens as (
-			insert into person_property_signup_tokens (property_of)
-			select id from person
+			,person_property_acquisition_fresh as (
+			insert into person_property_acquisition_fresh (property_of, end_of_waiting_period)
+			select id, (current_timestamp + '0 days') from person
+			returning id
+			)
+		select id from person
+		", [Login, Name]),
+	{{select, N}, NewUserIdTupleList}.
+
+%%update signup token sending date
+signup_token_sent_date(Id) ->
+	{{update, 1}, _} = pp_db:extended_query("
+		update person_property_acquisition_organic
+		set date_token_sent = current_timestamp
+		where property_of = $1
+		returning id
+	", [Id]).
+
+%% create and return new signup token
+signup_token_creation(Id) -> 
+	{{select, N}, TokenTupleList} = pp_db:extended_query("
+		with 
+			person_property_tokens_signup as (
+			insert into person_property_tokens_signup (property_of)
+			select $1
 			returning token_value
 			)
-		select token_value from person_property_signup_tokens
-		", [Login ]),
-	{{select, 1}, TokenTupleList}.
+		select token_value from person_property_tokens_signup
+		", [Id]),
+	{{select, N}, TokenTupleList}.
 
 %%signup token validation
 id_given_signup_token(JoinToken) ->
-	{{select,N}, IdTupleList} = pp_db:extended_query("select property_of, is_token_activated from person_property_signup_tokens where token_value = $1", [JoinToken]),
+	{{select,N}, IdTupleList} = pp_db:extended_query("select property_of, is_token_activated from person_property_tokens_signup where token_value = $1", [JoinToken]),
 	{{select,N}, IdTupleList}.
 
 %%account activation
 activate_new_account(Id) ->
-	{{update, 1}, _} = pp_db:extended_query("update person_property_signup_tokens set is_token_activated = true where property_of=$1", [Id]),
+	{{update, 1}, _} = pp_db:extended_query("update person_property_tokens_signup set is_token_activated = true where property_of=$1", [Id]),
 	{{update, 1}, _} = pp_db:extended_query("update person_property_credentials set is_account_active = true where property_of=$1", [Id]),
 	ok.
 
@@ -87,7 +104,8 @@ cookie_given_id(Id) ->
 	{N, CookieTupleList}.
 
 %% check in db if cookie exists. Get Id given cookie and update cookie timestamp
-check_session_cookie(Cookie) ->
+%check_session_cookie(Cookie) ->
+id_given_cookie(Cookie) ->
 	%add something like where is_valid=1 to query to check only for valid cookies
 	{{select,N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_session p where cookie = $1 and p.is_cookie_valid = true", [Cookie]),
 	case N of 
@@ -127,9 +145,9 @@ log_signout(SessionId) ->
 %%insert new token for resetting pasword
 create_pw_token(Id) ->
 	%first delete any old token for the userid then insert
-	{{delete, _}, _} = pp_db:extended_query("delete from person_property_pw_tokens where property_of = $1", [Id]),
-	%{{insert, 0, 1}, _} = 	pp_db:extended_query("insert into person_property_pw_tokens(property_of) values($1) returning token_value", [Id]).
-	{{insert, 1}, _} = 	pp_db:extended_query("insert into person_property_pw_tokens(property_of) values($1) returning token_value", [Id]).
+	{{delete, _}, _} = pp_db:extended_query("delete from person_property_tokens_pw where property_of = $1", [Id]),
+	%{{insert, 0, 1}, _} = 	pp_db:extended_query("insert into person_property_tokens_pw(property_of) values($1) returning token_value", [Id]).
+	{{insert, 1}, _} = 	pp_db:extended_query("insert into person_property_tokens_pw(property_of) values($1) returning token_value", [Id]).
 
 %%check if password token is valid and return id if it is
 id_given_valid_pw_token(Token) ->
@@ -137,7 +155,7 @@ id_given_valid_pw_token(Token) ->
 	%the is_token_activated field is to ensure the user has actually clicked on the email link, and it is not a malicious user somehow sending the form.
 	%check for is_token_activated because user might click on pw reset link but not actually change the pw. so the link can be clicked only once. 
 	%also check for is_token_used to prevent reuse/abuse of token
-	{{select,N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_pw_tokens p where token_value = $1 and is_token_used = false and is_token_activated = false and p.is_pw_token_valid = true", [Token]),
+	{{select,N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_tokens_pw p where token_value = $1 and is_token_used = false and is_token_activated = false and p.is_pw_token_valid = true", [Token]),
 	%it is possible to call the function check_valid_pw_token, but better to have a single query and add a condition to it. 
 	%erlang:display(IdTupleList),
 	{{select,N}, IdTupleList}.
@@ -148,15 +166,15 @@ update_pw(Id, NewPassword) ->
 
 %%update password given login
 activate_pw_token(Id) ->
-	{{update, 1}, _} = pp_db:extended_query("update person_property_pw_tokens set is_token_activated = true where property_of=$1", [Id]).
+	{{update, 1}, _} = pp_db:extended_query("update person_property_tokens_pw set is_token_activated = true where property_of=$1", [Id]).
 
 %%check if there is valid and activated pw token
 check_valid_pw_token(Id) ->
-	{{select, 1}, _} = pp_db:extended_query("select 1 from person_property_pw_tokens p where property_of=$1 and is_token_used = false and is_token_activated = true and p.is_pw_token_valid = true", [Id]).
+	{{select, 1}, _} = pp_db:extended_query("select 1 from person_property_tokens_pw p where property_of=$1 and is_token_used = false and is_token_activated = true and p.is_pw_token_valid = true", [Id]).
 
 %%set is_token_used to true to prevent reuse/abuse
 disable_pw_token(Id) ->
-	{{update, 1}, _} = pp_db:extended_query("update person_property_pw_tokens set is_token_used = true where property_of=$1", [Id]).
+	{{update, 1}, _} = pp_db:extended_query("update person_property_tokens_pw set is_token_used = true where property_of=$1", [Id]).
 
 % %% imagery
 %% save image details to db
@@ -343,7 +361,7 @@ get_new_pics(UserId) ->
 		)
 		,adjs_temp as (
 		select w1_adj, w1_prop, w2_adj, w2_prop--, row_number() over (order by w1_prop) 
-		from adj_pair_list
+		from _mv_adj_pair_list
 		order by random()
 		limit 5
 		)
@@ -390,7 +408,7 @@ get_this_pic(PicId) ->
 		)
 		,adjs_temp as (
 		select w1_adj, w1_prop, w2_adj, w2_prop--, row_number() over (order by w1_prop) 
-		from adj_pair_list
+		from _mv_adj_pair_list
 		order by random()
 		limit 1
 		)
@@ -476,41 +494,8 @@ record_votes(Adj1, Adj2, VoteChoice, PicId, UserId) ->
 			where not exists (select from person2pic_vote) -- check the vote for this specific combination (person, pic, adj1/2) doesnt already exist
 			returning id
 	", [Adj1, Adj2, VoteChoice, PicId, UserId]).
-%	ImgAdjTupleList.
 
 % %% maintenance and updates
-%% materialized view pic_adj_adj
-%{{select, _N}, []} = 
-materialized_view(create, pic_adj_adj) ->
-	pp_db:simple_query(" 
-		  create materialized view pic_adj_adj as 
-		  select
-			a2p.target AS picture
-			,(select ap.word where ap.property_of = a2a.source) as adj1
-			,(select ap.property_of where ap.property_of = a2a.source) as adj1_id
-			,(select ap2.word where ap2.property_of = a2a.target) as adj2
-			,(select ap2.property_of where ap2.property_of = a2a.target) as adj2_id
-			,pp.picture_uri as uri
-		  from 
-			adjective_to_adjective as a2a 
-			join adjective_property as ap on ((a2a.source=ap.property_of) and (ap.is_adjective_active=true))
-			join adjective_property as ap2 on ((a2a.target=ap2.property_of) and (ap2.is_adjective_active=true)) 
-			join adjective_to_adjective_property as a2ap on ((a2ap.property_of = a2a.id) and (a2ap.is_pair=true))
-			join adjective_to_picture as a2p on ((a2p.source = a2a.source))
-			join adjective_to_picture as a2p2 on ((a2p2.source = a2a.target) and (a2p.target = a2p2.target))
-			join adjective_to_picture_property as a2pp on ((a2p.id = a2pp.property_of) and (a2pp.show_adjective_with_picture=true))
-			join adjective_to_picture_property as a2pp2 on ((a2p2.id = a2pp2.property_of) and (a2pp2.show_adjective_with_picture=true))
-			join picture_property as pp on ((pp.property_of=a2p.target) and (pp.is_picture_active=true) and (pp.malware_free=true))
-		");
-materialized_view(select, pic_adj_adj) ->
-	pp_db:simple_query("select * from pic_adj_adj");
-%{{drop, materialized_view}, []} = 
-materialized_view(drop, pic_adj_adj) ->
-	pp_db:simple_query("drop materialized view pic_adj_adj");
-%{{refresh, materialized_view}, []} = 
-materialized_view(refresh, pic_adj_adj) ->
-	pp_db:simple_query("refresh materialized view pic_adj_adj").
-
 %%update adjective active status based on vetted status.  
 %is_adjective_active default and is_adjective_vetted both default to null. 
 %new pic/adj insertion query doesnt change this
