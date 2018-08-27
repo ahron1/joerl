@@ -66,10 +66,10 @@ set_new_pw(Req0) ->
 					%so send 200 and have js do the redirection
 					%H_redir = #{<<"Location">> => <<"https://192.168.43.220:8765">>},
 					%{303, H_redir, <<>>}
-					{200, H0, <<"password changed. login again">>}
+					{200, H0, <<"Your password has been set. Please login.">>}
 					;
 				_ ->
-					{400, H0, <<"invalid token">>}
+					{400, H0, <<"Your password token was valid only for 24 hours, please go to the login screen and reset your password (again).">>}
 			end
 			;
 		_ ->

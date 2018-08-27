@@ -1,32 +1,62 @@
 -module(db_helpers).
 
--export([id_given_login_pw/2, id_given_login/1, name_given_id/1, active_status_given_login/1, new_account_creation/2, signup_token_creation/1, signup_token_sent_date/1, id_given_signup_token/1, activate_new_account/1]). 
+-export([id_given_login_pw/2, id_given_login/1, name_given_id/1, active_status_given_id/1, is_invited_given_id/1, is_fresh_given_id/1, update_name/2, is_waiting_over/1, new_account_creation/2, create_signup_token/1, id_given_signup_token/1, activate_new_account/1]). 
 -export([id_given_cookie/1, create_session_cookie/1, delete_session_cookie/1, cookie_given_id/1, log_signin/2, log_signout/1]). 
 -export([create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1]).
 -export([image_details_to_db/6, get_new_pics/1, get_this_pic/1, record_votes/5]).
 -export([update_vetted_adj/0]).
 
 % %% account/id/pw
-%%get user id given submitted id/pw for logging in
+%% get user id given submitted id/pw for logging in
 id_given_login_pw(FormLogin, FormPassword) ->
 	{{select, N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_credentials where email=$1 and password_text=crypt($2, password_text)", [FormLogin, FormPassword]),
 	{{select, N}, IdTupleList}.
 
-%%get user id given submitted login id (check if login id is valid)
+%% get user id given submitted login id (check if login id is valid)
 id_given_login(FormLogin) ->
 	{{select, N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_credentials where email=$1", [FormLogin]),
 	{{select, N}, IdTupleList}.
 
-%%get user name given id
+%% get user name given id
 name_given_id(Id) -> 
 	{{select, 1}, NameTupleList} = pp_db:extended_query("select name from person_property where property_of = $1", [Id]),
 	[{Name}] = NameTupleList,
 	Name. 
 
+%% check if user is present in person_property_acquisition_invited db
+is_invited_given_id(Id) ->
+	{{select, N}, _} = pp_db:extended_query("select id from person_property_acquisition_invited where property_of = $1", [Id]),
+	case N of 
+		1 ->
+			true;
+		0 ->
+			false 
+	end.
+
+%% check if user is present in person_property_acquisition_fresh db
+is_fresh_given_id(Id) ->
+	{{select, N}, _} = pp_db:extended_query("select id from person_property_acquisition_fresh where property_of = $1", [Id]),
+	case N of 
+		1 ->
+			true;
+		0 ->
+			false
+	end.
+
 %% get account activation status from the database given the submitted login
-active_status_given_login(FormLogin) ->
-	{{select,N}, ActiveStatusTupleList} = pp_db:extended_query("select is_account_active from person_property_credentials where email = $1", [FormLogin]),
+active_status_given_id(Id) ->
+	{{select,N}, ActiveStatusTupleList} = pp_db:extended_query("select is_account_active from person_property_credentials where property_of = $1", [Id]),
 	{{select,N}, ActiveStatusTupleList}.
+
+%% update first name in db
+update_name(Id, Name) ->
+	{{update, 1}, X} = pp_db:extended_query("update person_property set name = $2 where property_of=$1", [Id, Name]),
+	{{update, 1}, X}.
+
+%% is waiting period over
+is_waiting_over(Id) ->
+	{{select, N}, TFTuple} = pp_db:extended_query("select (select current_timestamp - end_of_waiting_period from person_property_acquisition_fresh where property_of = $1) > interval '0'", [Id]),
+	{{select, N}, TFTuple}.
 
 %% new (inactive) account creation using given login/name
 %% adjust hardcoded value in last expression to change waiting time
@@ -57,35 +87,32 @@ new_account_creation(Login, Name) ->
 		", [Login, Name]),
 	{{select, N}, NewUserIdTupleList}.
 
-%%update signup token sending date
-signup_token_sent_date(Id) ->
-	{{update, 1}, _} = pp_db:extended_query("
-		update person_property_acquisition_organic
-		set date_token_sent = current_timestamp
-		where property_of = $1
-		returning id
-	", [Id]).
-
 %% create and return new signup token
-signup_token_creation(Id) -> 
+create_signup_token(Id) -> 
 	{{select, N}, TokenTupleList} = pp_db:extended_query("
 		with 
 			person_property_tokens_signup as (
 			insert into person_property_tokens_signup (property_of)
 			select $1
+			on conflict (property_of)
+			do 
+			    update set
+					token_value = encode(hmac(gen_random_uuid()::text, gen_salt('md5'::text), 'sha256'::text), 'hex'::text)
+					,time_of_creation = current_timestamp
 			returning token_value
 			)
 		select token_value from person_property_tokens_signup
 		", [Id]),
 	{{select, N}, TokenTupleList}.
 
-%%signup token validation
+%% signup token validation
 id_given_signup_token(JoinToken) ->
-	{{select,N}, IdTupleList} = pp_db:extended_query("select property_of, is_token_activated from person_property_tokens_signup where token_value = $1", [JoinToken]),
-	{{select,N}, IdTupleList}.
+	{{select,N}, IdActTupleList} = pp_db:extended_query("select property_of, is_token_activated from person_property_tokens_signup where token_value = $1", [JoinToken]),
+	{{select, N}, IdActTupleList}.
 
-%%account activation
+%% account activation
 activate_new_account(Id) ->
+	%todo: below transactions should be made atomic with setting of password
 	{{update, 1}, _} = pp_db:extended_query("update person_property_tokens_signup set is_token_activated = true where property_of=$1", [Id]),
 	{{update, 1}, _} = pp_db:extended_query("update person_property_credentials set is_account_active = true where property_of=$1", [Id]),
 	ok.
@@ -170,7 +197,8 @@ activate_pw_token(Id) ->
 
 %%check if there is valid and activated pw token
 check_valid_pw_token(Id) ->
-	{{select, 1}, _} = pp_db:extended_query("select 1 from person_property_tokens_pw p where property_of=$1 and is_token_used = false and is_token_activated = true and p.is_pw_token_valid = true", [Id]).
+	{{select, N}, X} = pp_db:extended_query("select 1 from person_property_tokens_pw p where property_of=$1 and is_token_used = false and is_token_activated = true and p.is_pw_token_valid = true", [Id]),
+	{{select, N}, X}.
 
 %%set is_token_used to true to prevent reuse/abuse
 disable_pw_token(Id) ->
