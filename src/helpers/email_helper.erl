@@ -1,9 +1,9 @@
 -module(email_helper).
--export([send_pw_reset_email/3, send_signup_token_email/4]).
+-export([send_website_message/3, send_pw_reset_email/3, send_signup_token_email/4]).
 
 %send email
-send(Sender, UserEmail, Message) ->
-	gen_smtp_client:send({Sender, [UserEmail], Message}, [{relay, "smtp.gmail.com"}, {tls, always}, {port, 587}, {username, "arunanda1985@gmail.com"}, {password, "Dakini1234"}]).
+send(Sender, ReceiverEmail, Message) ->
+	gen_smtp_client:send({Sender, [ReceiverEmail], Message}, [{relay, "smtp.gmail.com"}, {tls, always}, {port, 587}, {username, "arunanda1985@gmail.com"}, {password, "Dakini1234"}]).
 
 %password reset emails
 %send the password reset token email
@@ -72,4 +72,11 @@ build_signup_token_email(TokenValue, _Id, UserEmail, Name) ->
 	%erlang:display(EmailHeaders),
 	{EmailHeaders, EmailBody}.
 
-
+%send website messages
+send_website_message(WebUserName, WebUserEmail, MessageContent) ->
+	Message = general_helpers:list_merge_no_sort(["Sender Name - ", WebUserName, "\n", "Sender Email -  ", WebUserEmail, "\n", MessageContent]),
+	%Message = general_helpers:list_merge_no_sort([ WebUserName, "\n", WebUserEmail, "\n", MessageContent]),
+	erlang:display(Message),
+	Sender = "JoChoice Messenger",
+	ReceiverEmail = <<"shriyogeshchandra@gmail.com">>,
+	send(Sender, ReceiverEmail, Message).
