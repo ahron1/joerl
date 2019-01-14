@@ -1,6 +1,6 @@
 -module(db_helpers).
 
--export([id_given_login_pw/2, id_given_login/1, name_given_id/1, active_status_given_id/1, is_invited_given_id/1, is_fresh_given_id/1, update_name/2, is_waiting_over/1, new_account_creation/2, create_signup_token/1, id_given_signup_token/1, activate_new_account/1]). 
+-export([id_given_login_pw/2, id_given_login/1, get_sys_user/0, name_given_id/1, active_status_given_id/1, is_invited_given_id/1, is_fresh_given_id/1, update_name/2, is_waiting_over/1, new_account_creation/2, create_signup_token/1, id_given_signup_token/1, activate_new_account/1]). 
 -export([id_given_cookie/1, create_session_cookie/1, delete_session_cookie/1, cookie_given_id/1, log_signin/2, log_signout/1]). 
 -export([create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1]).
 -export([image_details_to_db/6, get_new_pics/1, get_this_pic/1, record_votes/5]).
@@ -16,6 +16,11 @@ id_given_login_pw(FormLogin, FormPassword) ->
 id_given_login(FormLogin) ->
 	{{select, N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_credentials where email=$1", [FormLogin]),
 	{{select, N}, IdTupleList}.
+
+%% get random system user id (for uploading system pics)
+get_sys_user() ->
+	{{select, 1}, IdTupleList} = pp_db:simple_query("select property_of from person_property_credentials where is_system_user=true order by random() limit 1"),
+	IdTupleList.
 
 %% get user name given id
 name_given_id(Id) -> 
@@ -551,3 +556,5 @@ update_vetted_adj() ->
 
 %if it is necessary to use quoted column names escape the quotes as below:
 %{{select,N}, UserId} = pp_db:extended_query("select \"userid\" from cookietable where value = $1", [Cookie]),
+
+

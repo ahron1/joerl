@@ -1,12 +1,7 @@
-%% based on the upload example packaged with cowboy
-%% @doc Upload handler.
 %% upload new images from client to server/db
-
+%%to do: abstract login checks into new module across different  handlers
 -module(upload_handler).
 -export([init/2]).
-
-%%to do: add new funs to check req body to check cookie status and send ERRONEOUS REQ like in login handler
-%%to do later: abstract above into new module across (upload, message, profile?, etc.) handlers
 
 init(Req0, Opts) ->
 	{CookieStatus, User} = entry_helpers:check_session_cookie(Req0),
@@ -136,6 +131,7 @@ extract_file_and_adjs(Req) ->
 %%https://gist.github.com/dch/bb33330a6d68b8149103
 get_hash(<<CryptoHash:20/big-unsigned-integer-unit:8>>) ->
 	lists:flatten(io_lib:format("~40.16.0b", [CryptoHash])).
+
 
 %%prepend timestamp to the uploaded file name
 create_file_name(FileName, FileHash) ->

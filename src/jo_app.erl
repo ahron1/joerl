@@ -10,13 +10,16 @@
 
 start(_Type, _Args) ->
 	Dispatch = make_dispatch(),
-	PrivDir = code:priv_dir(jo),
-	{ok, _} = cowboy:start_tls(https, [
-	{port, 8443},
-	{cacertfile, PrivDir ++ "/ssl/cowboy-ca.crt"},
-	{certfile, PrivDir ++ "/ssl/server.crt"},
-	{keyfile, PrivDir ++ "/ssl/server.key"}
-	], #{env => #{dispatch => Dispatch}}),
+%	PrivDir = code:priv_dir(jo),
+%	{ok, _} = cowboy:start_tls(https, [
+%	{port, 8443},
+%	{cacertfile, PrivDir ++ "/ssl/cowboy-ca.crt"},
+%	{certfile, PrivDir ++ "/ssl/server.crt"},
+%	{keyfile, PrivDir ++ "/ssl/server.key"}
+%	], #{env => #{dispatch => Dispatch}}),
+	{ok, _} = cowboy:start_clear(http, [{port, 8080}], #{
+		env => #{dispatch => Dispatch}
+	}),
 	jo_sup:start_link().
 
 make_dispatch() ->

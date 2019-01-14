@@ -8,4 +8,5 @@ init(Req0, State) ->
 						   #{<<"content-type">> => <<"text/plain">>},
 						  <<"This page doesn't seem to exist. Please try again \n">>,
 						  Req0),
+	erlang:display(general_handler),
 	{ok, Req, State}.

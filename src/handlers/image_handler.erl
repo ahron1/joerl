@@ -10,6 +10,8 @@ init(Req0, Opts) ->
 	{ok, _Headers1, Req2} = cowboy_req:read_part(Req0),
 	{ok, WhichImage, _Req3} = cowboy_req:read_part_body(Req2),
 
+	erlang:display(whichImage),
+	erlang:display(WhichImage),
 	{ResponseBody, ResponseStatus} = send_image(WhichImage, CookieStatus, User),
 
 	Req = cowboy_req:reply(ResponseStatus, #{
