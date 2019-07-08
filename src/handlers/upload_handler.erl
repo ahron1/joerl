@@ -1,5 +1,7 @@
 %% upload new images from client to server/db
 %%to do: abstract login checks into new module across different  handlers
+%todo - make a separate dir for hosting, which contains soft links to images, in a flat file structure (without daily dirs)
+
 -module(upload_handler).
 -export([init/2]).
 
@@ -15,7 +17,8 @@ init(Req0, Opts) ->
 
 %% check loggedin status and process upload request
 upload_processor(has_session_cookie, User, Req0) ->
-	MaxFileSize = 4500000, %bytes
+	MaxFileSize = 4500000, %bytes 4.5MB
+	MinFileSize = 4500, %bytes 4.5KB
 	{FileData, FileName, FileSize, Adj1, Adj2} = extract_file_and_adjs(Req0),
 	{ok, FileMime} = emagic:from_buffer(FileData), % Mime based on magic numbers
 
@@ -30,7 +33,7 @@ upload_processor(has_session_cookie, User, Req0) ->
 		file_valid ->
 			FileHash = get_hash(crypto:hash(sha, FileData)),
 			{FinalFileName, FileNameWithPath, TempFile, ImageUri} = create_file_name(FileName, FileHash),
-			{ResponseBody, ResponseStatus} = file_storage(FileSize, MaxFileSize, FinalFileName, FileNameWithPath, TempFile, FileData, User, ImageUri, Adj1, Adj2),
+			{ResponseBody, ResponseStatus} = file_storage(FileSize, MinFileSize, MaxFileSize, FinalFileName, FileNameWithPath, TempFile, FileData, User, ImageUri, Adj1, Adj2),
 			{ResponseBody, ResponseStatus};
 		file_not_valid  ->
 			ResponseBody = <<"Please upload an image of your choice. Accepted formats are jpeg, png, and gif.">>,
@@ -54,6 +57,7 @@ upload_processor(_, _, _) ->
 
 %%check mime type and file extension and if they match
 %%file_adj_validator(FileName, FileMime, is_mime_ok(FileMime), Adj1, Adj2) 
+%TODO: add tests to check adj has only valid characters
 file_adj_validator(_, _, _, <<>>, _Adj2) ->
 	erlang:display(adj1notvalid),
 	adj_not_valid;
@@ -115,7 +119,7 @@ extract_file_and_adjs(Req) ->
 %	{file, <<"inputfile">>, FileName, _} = cow_multipart:form_data(Headers),
 %	erlang:display(FileName),
 
-%add checks to be sure Headers are what they should be. prevent tampered requests. 
+%TODO: checks to be sure Headers are what they should. prevent tampered requests. 
 	{ok, _Headers1, Req4} = cowboy_req:read_part(Req3),
 	{ok, DataAdj1, Req5} = cowboy_req:read_part_body(Req4),
 
@@ -138,30 +142,35 @@ create_file_name(FileName, FileHash) ->
 	Name = binary:bin_to_list(FileName),
 	FileExt = filename:extension(Name),
 	% TODO: get suffix from mime type, not submitted extension. 
-	FinalFileName = lists:concat([FileHash, FileExt]),
-
-	ImageDir = "/usr/home/yc/vm_shared_dir/demo/jquery_mobile/test1/images",
-	TempDir = "/usr/home/yc/vm_shared_dir/temp/uploaded/staging",
-	UriDir= "/images",
+	FinalFileName = lists:concat([FileHash, FileExt]), %e.g. kjklj34.jpg
+	
+	%create corresponding mounts/dirs in jails
+	%dir structure : /pictures/staging/dd-mm-yyyy/xyzwq385.JPG
+	%todo - make a separate dir for hosting, which contains soft links to images, in a flat file structure (without daily dirs)
+	ImageDir = "/pictures/uploaded", %final image location (written to db) dir; no jail has rw permission, only image.sh (runs on host) can rw to this
+	TempDir = "/pictures/staging",  %/pictures/staging on host, mounted as staging dir; webserver jail should be able to write
+	UriDir= "/images", %hosting dir; nginx jail should be able to read
 	Slash = "/",
+	Hyphen="-",
 	{{YYYY, MM, DD},{_H,_M,_S}} = calendar:local_time(),
 	Year = integer_to_list(YYYY),
 	Month = integer_to_list(MM),
 	Date = integer_to_list(DD),
 
-	UriPath = general_helpers:list_merge_no_sort([UriDir, Slash, Year, Slash, Month, Slash, Date, Slash]),
-	ImageUri = lists:concat([UriPath, FinalFileName]),
-	FileDirPath = general_helpers:list_merge_no_sort([ImageDir, Slash, Year, Slash, Month, Slash, Date, Slash]),
-	FileNameWithPath = lists:concat([FileDirPath, FinalFileName]),
-	TempPath = general_helpers:list_merge_no_sort([TempDir, Slash, Date, Slash]),
-	TempFile = lists:concat([TempPath, FinalFileName]),
+	DailyDir = general_helpers:list_merge_no_sort([Date, Hyphen, Month, Hyphen, Year]), %e.g. 22-2-2002
+	UriPath = general_helpers:list_merge_no_sort([UriDir, Slash, DailyDir]), %e.g. /images/22-2-2002
+	ImageUri = general_helpers:list_merge_no_sort([UriPath, Slash, FinalFileName]),  %e.g. /images/22-2-2002/kjklj34.jpg 
+	FileDirPath = general_helpers:list_merge_no_sort([ImageDir, Slash, DailyDir]),  %e.g. /pictures/uploaded/22-2-2002  
+	FileNameWithPath = general_helpers:list_merge_no_sort([FileDirPath, Slash, FinalFileName]),  %e.g. /pictures/uploaded/22-2-2002/kjklj34.jpg 
+	TempPath = general_helpers:list_merge_no_sort([TempDir, Slash, DailyDir, Slash ]), %e.g. /pictures/staging/22-2-2002/
+	TempFile = general_helpers:list_merge_no_sort([TempPath, FinalFileName]), %e.g. /pictures/staging/22-2-2002/kjklj34.jpg
 
-	ok = filelib:ensure_dir(FileDirPath),
+	%ok = filelib:ensure_dir(FileDirPath), %this is done by the image.sh script
 	ok = filelib:ensure_dir(TempPath),
 	{FinalFileName, FileNameWithPath, TempFile, ImageUri}.
 
 %%if filesize is okay, store file (in filesystem) and create response
-file_storage(FileSize, MaxFileSize, FinalFileName, FileNameWithPath, TempFile,  FileData, User, ImageUri, Adj1, Adj2) when (FileSize < MaxFileSize)  ->
+file_storage(FileSize, MinFileSize,  MaxFileSize, FinalFileName, FileNameWithPath, TempFile,  FileData, User, ImageUri, Adj1, Adj2) when (FileSize < MaxFileSize) andalso  (FileSize > MinFileSize) ->
 	{ok, WriteHandle} = file:open(TempFile, write),
 	io:format(WriteHandle, "~s", [FileData]),
 	% consider opening file in raw mode using file:write (faster)
@@ -171,12 +180,17 @@ file_storage(FileSize, MaxFileSize, FinalFileName, FileNameWithPath, TempFile,  
 	Status = 200,
 	{Body, Status};
 
-file_storage(FileSize, MaxFileSize, _FinalFileName, _FileNameWithPath, _TempFile, _FileData, _User, _ImageUri, _Adj1, _Adj2) when (FileSize > MaxFileSize)  ->
+file_storage(FileSize, _MinFileSize,  MaxFileSize, _FinalFileName, _FileNameWithPath, _TempFile, _FileData, _User, _ImageUri, _Adj1, _Adj2) when (FileSize > MaxFileSize)  ->
 	Body = <<"File too large">>,
 	Status = 500,
 	{Body, Status};
 
-file_storage(_FileSize, _MaxFileSize, _FinalFileName, _FileNameWithPath, _TempFile, _FileData, _User, _ImageUri, _Adj1, _Adj2) ->
+file_storage(FileSize, MinFileSize,  _MaxFileSize, _FinalFileName, _FileNameWithPath, _TempFile, _FileData, _User, _ImageUri, _Adj1, _Adj2) when (FileSize < MinFileSize)  ->
+	Body = <<"File too small">>,
+	Status = 500,
+	{Body, Status};
+
+file_storage(_FileSize, _MinFileSize,  _MaxFileSize, _FinalFileName, _FileNameWithPath, _TempFile, _FileData, _User, _ImageUri, _Adj1, _Adj2) ->
 	Body = <<"Unknown error">>,
 	Status = 500,
 	{Body, Status}.

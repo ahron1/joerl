@@ -8,32 +8,28 @@
 
 init(Req0, Opts) ->
 
-	{_CookieStatus, _User} = entry_helpers:check_session_cookie(Req0),
-%% remove cookie status check in both erl and js - anyone can send message. 
+%	{_CookieStatus, _User} = entry_helpers:check_session_cookie(Req0),
+%   no cookie status check in both erl and js - anyone can send message. 
 
-%	case CookieStatus of
-%		has_no_session_cookie ->
-%			ResponseBody = <<"Not logged in">>,
-%			ResponseStatus = 400,
-%			{ResponseBody, ResponseStatus};
-%		has_session_cookie ->
-			{SenderName, SenderEmail, MessageContent} = extract_message_contents(Req0),
-			
-%			erlang:display(xxxxxxxxxxxxxxxxxxxxx),
-%			erlang:display(MessageContent),
-%			erlang:display(SenderName),
-%			erlang:display(SenderEmail),
-%			erlang:display(xxxxxxxxxxxxxxxxxxxxx),
+	{SenderName, SenderEmail, MessageContent} = extract_message_contents(Req0),
+	
+%	erlang:display(xxxxxxxxxxxxxxxxxxxxx),
+%	erlang:display(MessageContent),
+%	erlang:display(SenderName),
+%	erlang:display(SenderEmail),
+%	erlang:display(xxxxxxxxxxxxxxxxxxxxx),
 
-			MessageContentCleaned = general_helpers:escape_html(MessageContent),
-			SenderNameCleaned = general_helpers:escape_html(SenderName),
-			_SenderEmailCleaned = general_helpers:escape_html(SenderEmail),
-			email_helper:send_website_message(binary:bin_to_list(SenderNameCleaned), binary:bin_to_list(SenderEmail), binary:bin_to_list(MessageContentCleaned)),
+	MessageContentCleaned = general_helpers:escape_html(MessageContent),
+	SenderNameCleaned = general_helpers:escape_html(SenderName),
+	_SenderEmailCleaned = general_helpers:escape_html(SenderEmail),
+	email_helper:send_website_message(binary:bin_to_list(SenderNameCleaned), binary:bin_to_list(SenderEmail), binary:bin_to_list(MessageContentCleaned)),
 
-			ResponseBody = <<"Thank you for your message! We will read it shortly.">>,
-			ResponseStatus = 200,
-			%{ResponseBody, ResponseStatus},
-%	end,
+	ResponseBody = <<"Thank you for your message! We will read it shortly.">>,
+	ResponseStatus = 200,
+
+	%send reply to sender
+	email_helper:send_website_message_autoreply(binary:bin_to_list(SenderNameCleaned), binary:bin_to_list(SenderEmail)), 
+
 	Req = cowboy_req:reply(ResponseStatus, #{
 		<<"content-type">> => <<"text/html">>
 		}, ResponseBody, Req0),

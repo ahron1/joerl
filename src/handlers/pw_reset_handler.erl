@@ -98,7 +98,7 @@ token_validation(PwToken) ->
 
 			%H_redir = #{<<"Location">> => <<"https://192.168.64.2:8443/pwresetform">>},
 			%{302, H_redir, <<"token is okay">>}
-			Body_form = reset_form_body(),
+			Body_form = pw_form_body(),
 			H_form = #{<<"content-type">> => <<"text/html">>},
 			{200, H_form, Body_form}
 			;
@@ -111,7 +111,7 @@ token_validation(PwToken) ->
 %%prepare the html/js pw reset form to be sent to client. 
 %%safest to send it bespoke from server in response to valid token 
 %%instead of a prebuilt page that can also be accessed from elsewhere. 
-reset_form_body() ->
+pw_form_body() ->
 <<"
 <html>
 	<head>

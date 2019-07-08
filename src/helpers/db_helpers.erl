@@ -3,7 +3,7 @@
 -export([id_given_login_pw/2, id_given_login/1, get_sys_user/0, name_given_id/1, active_status_given_id/1, is_invited_given_id/1, is_fresh_given_id/1, update_name/2, is_waiting_over/1, new_account_creation/2, create_signup_token/1, id_given_signup_token/1, activate_new_account/1]). 
 -export([id_given_cookie/1, create_session_cookie/1, delete_session_cookie/1, cookie_given_id/1, log_signin/2, log_signout/1]). 
 -export([create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1]).
--export([image_details_to_db/6, get_new_pics/1, get_this_pic/1, record_votes/5]).
+-export([image_details_to_db/6, image_details_to_db_special/6, get_new_pics/1, get_this_pic/1, record_votes/5]).
 -export([update_vetted_adj/0]).
 
 % %% account/id/pw
@@ -58,7 +58,7 @@ update_name(Id, Name) ->
 	{{update, 1}, X} = pp_db:extended_query("update person_property set name = $2 where property_of=$1", [Id, Name]),
 	{{update, 1}, X}.
 
-%% is waiting period over
+%% is waiting period over - return true(waiting period is over)/false(waiting period is not over)/null(no record for this ID)
 is_waiting_over(Id) ->
 	{{select, N}, TFTuple} = pp_db:extended_query("select (select current_timestamp - end_of_waiting_period from person_property_acquisition_fresh where property_of = $1) > interval '0'", [Id]),
 	{{select, N}, TFTuple}.
@@ -111,6 +111,7 @@ create_signup_token(Id) ->
 	{{select, N}, TokenTupleList}.
 
 %% signup token validation
+%% todo - also check if the token is valid pp_tokens_signup.is_signup_token_valid  - table/inline function. the function exists but is not used currently. so unused signup tokens are indefinitely valid. potential security risk? 
 id_given_signup_token(JoinToken) ->
 	{{select,N}, IdActTupleList} = pp_db:extended_query("select property_of, is_token_activated from person_property_tokens_signup where token_value = $1", [JoinToken]),
 	{{select, N}, IdActTupleList}.
@@ -118,8 +119,8 @@ id_given_signup_token(JoinToken) ->
 %% account activation
 activate_new_account(Id) ->
 	%todo: below transactions should be made atomic with setting of password
-	{{update, 1}, _} = pp_db:extended_query("update person_property_tokens_signup set is_token_activated = true where property_of=$1", [Id]),
 	{{update, 1}, _} = pp_db:extended_query("update person_property_credentials set is_account_active = true where property_of=$1", [Id]),
+	{{update, 1}, _} = pp_db:extended_query("update person_property_tokens_signup set is_token_activated = true where property_of=$1", [Id]),
 	ok.
 
 % %% cookies
@@ -196,7 +197,7 @@ id_given_valid_pw_token(Token) ->
 update_pw(Id, NewPassword) ->
 	{{update, 1}, _} = pp_db:extended_query("update person_property_credentials set password_text = (crypt($1, gen_salt('bf', 8))) where property_of=$2", [NewPassword, Id]).
 
-%%update password given login
+%%activate password token given login
 activate_pw_token(Id) ->
 	{{update, 1}, _} = pp_db:extended_query("update person_property_tokens_pw set is_token_activated = true where property_of=$1", [Id]).
 
@@ -210,8 +211,8 @@ disable_pw_token(Id) ->
 	{{update, 1}, _} = pp_db:extended_query("update person_property_tokens_pw set is_token_used = true where property_of=$1", [Id]).
 
 % %% imagery
-%% save image details to db
-image_details_to_db(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
+%% save image details to db via upload_handler_special. 
+image_details_to_db_special(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
 	{{select, 1}, [{NewImageId, {citext, Adj1Text}, {citext, Adj2Text}}]} = pp_db:extended_query("
 		with 
 		   -- input details from server
@@ -233,7 +234,10 @@ image_details_to_db(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
 		   ,inputword2 as (
 		   select ($6) as inputword
 		   )
-		   -- check conditions and insert into db
+		   ,syspic_bool as (
+		   select ('true'::boolean) as tf
+		   )
+	   -- check conditions and insert into db
 		   ,w1 as ( 
 		   select word, property_of
 		   from   adjective_property
@@ -278,8 +282,8 @@ image_details_to_db(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
    		   returning id
  		   )     
  		   ,pp as (
- 		   insert into picture_property(property_of, filename, picture_uri, complete_path)
- 		   select id, (select filename from picfilename), (select uri from picuri), (select path from completepath) from p
+ 		   insert into picture_property(property_of, filename, picture_uri, complete_path, is_system_picture)
+ 		   select id, (select filename from picfilename), (select uri from picuri), (select path from completepath), (select tf from syspic_bool) from p
 		   on conflict  
 		   do nothing  --on duplicate file (name) do nothing (fail silently)
  		   )
@@ -382,10 +386,190 @@ image_details_to_db(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
 		join ap1 on ap1.property_of = a2p1.source
 		join a2p2 on p.id = a2p2.target
 		join w2 on w2.property_of = a2p2.source
-	", [UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2]),
+	", [UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2 ]),
+	{NewImageId, Adj1Text, Adj2Text}.
+
+%% save image details to db via webform
+%% difference with previous fun is the hardcoded value of syspic_bool
+image_details_to_db(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
+	{{select, 1}, [{NewImageId, {citext, Adj1Text}, {citext, Adj2Text}}]} = pp_db:extended_query("
+		with 
+		   -- input details from server
+		   userid as (
+		   select ($1::int) as id
+		   )
+		   ,picfilename as ( 
+		   select ($2) as filename
+		   )
+		   ,picuri as ( 
+		   select ($3) as uri
+		   )
+		   ,completepath as ( 
+		   select ($4) as path
+		   )
+		   ,inputword1 as ( 
+		   select ($5) as inputword
+		   )
+		   ,inputword2 as (
+		   select ($6) as inputword
+		   )
+		   ,syspic_bool as (
+		   select ('false'::boolean) as tf
+		   )
+	   -- check conditions and insert into db
+		   ,w1 as ( 
+		   select word, property_of
+		   from   adjective_property
+		   where  word = (select inputword from inputword1)
+		   )
+		   ,a1 as (
+		   insert into adjective            
+		   select                          
+		   where not exists (select from w1)
+		   returning id
+		   )
+		   ,ap1 as (
+		   insert into adjective_property (word, property_of) 
+		   select (select inputword from inputword1), id
+		   from   a1
+		   on conflict  
+		   do nothing  --on duplicate file (name) do nothing (fail silently)
+		   returning word, property_of
+		   )
+		   ,w2 as (
+		   select word, property_of
+		   from   adjective_property
+		   where  word = (select inputword from inputword2)
+		   )
+		   ,a2 as (
+     	   insert into adjective            
+   		   select                          
+		   where not exists (select from w2)
+		   returning id
+		   )
+		   ,ap2 as (
+		   insert into adjective_property (word, property_of) 
+		   select (select inputword from inputword2), id
+		   from   a2
+		   on conflict  
+		   do nothing  --on duplicate file (name) do nothing (fail silently)
+		   returning word, property_of
+		   ) 
+		   ,p as ( 
+		   insert into picture
+   		   values(default)
+   		   returning id
+ 		   )     
+ 		   ,pp as (
+ 		   insert into picture_property(property_of, filename, picture_uri, complete_path, is_system_picture)
+ 		   select id, (select filename from picfilename), (select uri from picuri), (select path from completepath), (select tf from syspic_bool) from p
+		   on conflict  
+		   do nothing  --on duplicate file (name) do nothing (fail silently)
+ 		   )
+ 		   ,person2p as (
+ 		   insert into person_to_picture(source, target)
+ 		   select (select id from userid), id from p
+ 		   returning id
+ 		   )
+ 		   ,person2pp as ( 
+ 		   insert into person_to_picture_property(property_of, is_uploader)
+ 		   select id, 'true' from person2p
+		   )
+		   ,a2p1 as ( 
+		   insert into adjective_to_picture(source, target) 
+		   values ((select property_of from ap1 union all select property_of from w1), (select id from p))
+		   returning id, target, source 
+		   )
+		   ,a2pp1 as (
+		   insert into adjective_to_picture_property(property_of, coupled_by) 
+		   select id, (select id from userid) from a2p1
+		   )
+		   ,a2p2 as (
+		   insert into adjective_to_picture(source, target) 
+		   values ((select property_of from ap2 union all select property_of from w2), (select id from p))
+		   returning id, target, source
+		   )
+		   ,a2pp2 as (
+		   insert into adjective_to_picture_property(property_of, coupled_by) 
+		   select id, (select id from userid) from a2p2
+		   )
+--	  	   ,a2a_new as (
+--		   insert into adjective_to_adjective(source, target)
+--		   values ( 
+--				(select property_of from w1 union all select property_of from ap1) 
+--				,(select property_of from w2 union all select property_of from ap2)
+--				)
+--		   on conflict  
+--		   do nothing 
+--		   returning source, target, id
+--		   )
+--		   ,a2ap as ( 
+--		   insert into adjective_to_adjective_property (property_of, is_pair)
+--		   select id, 'true' from a2a_new
+--		   where exists (select 1 from a2a_new) 
+--		   returning id, property_of
+--		   )
+		   ,person2a1 as ( 
+		   insert into person_to_adjective(source, target) 
+		   select (select id from userid), property_of from ap1
+		   where exists (select 1 from ap1) 
+		   returning id, target, source
+		   )
+		   ,person2a1p as (
+		   insert into person_to_adjective_property(property_of, is_uploader) 
+		   select id, 'true' from person2a1
+		   where exists (select 1 from person2a1)
+		   )    
+		   ,person2a2 as (
+		   insert into person_to_adjective(source, target) 
+		   select (select id from userid), property_of from ap2
+		   where exists (select 1 from ap2)
+		   returning id, target, source
+		   )
+		   ,person2a2p as ( 
+		   insert into person_to_adjective_property(property_of, is_uploader) 
+		   select id, 'true' from person2a2
+		   where exists (select 1 from person2a2)
+		   )    
+		   -- join tables and select output
+	    select p.id as pic, w1.word as adj1, w2.word as adj2 
+		from p
+		join a2p1 on p.id = a2p1.target
+		join w1 on w1.property_of = a2p1.source
+		join a2p2 on p.id = a2p2.target
+		join w2 on w2.property_of = a2p2.source
+
+		union all 
+
+		select p.id as pic, ap1.word as adj1, ap2.word as adj2 
+		from p
+		join a2p1 on p.id = a2p1.target
+		join ap1 on ap1.property_of = a2p1.source
+		join a2p2 on p.id = a2p2.target
+		join ap2 on ap2.property_of = a2p2.source
+
+		union all 
+
+		select p.id as pic, w1.word as adj1, ap2.word as adj2 
+		from p
+		join a2p1 on p.id = a2p1.target
+		join w1 on w1.property_of = a2p1.source
+		join a2p2 on p.id = a2p2.target
+		join ap2 on ap2.property_of = a2p2.source
+
+		union all 
+
+		select p.id as pic, ap1.word as adj1, w2.word as adj2 
+		from p
+		join a2p1 on p.id = a2p1.target
+		join ap1 on ap1.property_of = a2p1.source
+		join a2p2 on p.id = a2p2.target
+		join w2 on w2.property_of = a2p2.source
+	", [UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2 ]),
 	{NewImageId, Adj1Text, Adj2Text}.
 
 %% get list of next 5 pics (with adjectives) not seen by given user
+%% todo - additionally return session.pics array size to erlang code. if too large, reset array to empty. 
 get_new_pics(UserId) ->
 	{{select, _N}, ImgAdjTupleList} = pp_db:extended_query("
 	with 
@@ -401,9 +585,15 @@ get_new_pics(UserId) ->
 		,pics_temp as (
 		select picture_uri, property_of as pic_id--, row_number() over (order by picture_uri) 
 		from picture_property
-		where property_of <> all (
-			(select pics from person_property_session 
-			where property_of = (select id from person))::int[])
+		where 
+-- the next lines were to ensure that pics were not repeated in the same session
+-- they are skipped due to being a potential memory overflow risk
+-- todo - test and profile before re-enabling
+--			property_of <> all (
+--			(select pics from person_property_session 
+--			where property_of = (select id from person))::int[])
+--		and is_system_picture = false
+		is_picture_active = true
 		order by random()
 		limit 5
 		)

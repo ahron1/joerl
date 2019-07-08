@@ -27,12 +27,13 @@ make_dispatch() ->
 					   {'_', [{"/login", login_handler, []} 
 							 ,{"/logout", logout_handler, []}
 							 ,{"/uploadhandler", upload_handler, []}
+							 ,{"/uploadhandlerspecial", upload_handler_special, []}
 							 ,{"/messagehandler", message_handler, []}
 							 ,{"/imagehandler", image_handler, []}
 							 ,{"/voteshandler", votes_handler, []}
 							 ,{"/join/[:join_token]", join_handler, []}
-							 ,{"/resetpassword/[:pw_token]", pw_reset_handler, []}
-							 ,{"/activateaccount/[:activation_token]", account_activate_handler, []}
+							 %,{"/resetpassword/[:pw_token]", pw_reset_handler, []}
+							 ,{"/password/[:pw_token]", pw_handler, []}
 							 ,{'_', general_handler, []}
 							 ]}
 						 ]).
