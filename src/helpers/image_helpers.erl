@@ -8,7 +8,8 @@ extract(List) ->
 %anon fun for use in foldl accumulator. get the data bits (e.g. adj1, picid) from the db output and append them to their respective sublists. 
 func() ->
 	fun(Item, List) -> 
-		{PicIdInt, {citext, Adj1}, Adj1Id, {citext, Adj2}, Adj2Id, Uri} = Item,
+		%{PicIdInt, {citext, Adj1}, Adj1Id, {citext, Adj2}, Adj2Id, Uri} = Item,
+		{PicIdInt, Adj1, Adj1Id, Adj2, Adj2Id, Uri} = Item,
 		PicId = erlang:list_to_binary(erlang:integer_to_list(PicIdInt)),
 
 		[{<<"picid">>, ListPicId}, {<<"adj1">>, ListAdj1}, {<<"adj1_id">>, ListAdj1Id}, {<<"adj2">>, ListAdj2}, {<<"adj2_id">>, ListAdj2Id}, {<<"uri">>, ListUri}] = List,

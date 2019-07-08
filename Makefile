@@ -2,7 +2,7 @@ PROJECT = jo
 PROJECT_DESCRIPTION = New project
 PROJECT_VERSION = 0.1.0
 
-DEPS = cowboy cowlib ranch pgo backoff opencensus wts ctx jsx counters rfc3339 proper edown erl_img erlang_magic gen_smtp telemetry
+DEPS = cowboy cowlib ranch pgo backoff opencensus wts ctx jsx counters rfc3339 proper edown erl_img erlang_magic gen_smtp telemetry havoc
 
 dep_cowboy = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/cowboy
 dep_cowlib = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/cowlib
@@ -20,6 +20,7 @@ dep_edown = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/edown
 dep_rfc3339 = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/rfc3339
 dep_proper = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/proper
 dep_telemetry = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/telemetry
+dep_havoc = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/havoc
 
 dep_crontab = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/crontab
 dep_stdlib2 = cp /usr/home/yc/vm_shared_dir/cowboy_servers/erl_pkgs/stdlib2
