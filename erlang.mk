@@ -4425,7 +4425,7 @@ endef
 define dep_autopatch_fetch_rebar
 	mkdir -p $(ERLANG_MK_TMP); \
 	if [ ! -d $(ERLANG_MK_TMP)/rebar ]; then \
-		cp -R ~/vm_shared_dir/cowboy_servers/erl_pkgs/rebar $(ERLANG_MK_TMP)/rebar; \
+		cp -R /var/www/erl_pkgs/rebar $(ERLANG_MK_TMP)/rebar; \
 		cd $(ERLANG_MK_TMP)/rebar; \
 		git checkout -q 576e12171ab8d69b048b827b92aa65d067deea01; \
 		$(MAKE); \
@@ -6709,7 +6709,7 @@ RELX_CONFIG ?= $(CURDIR)/relx.config
 
 #RELX_URL ?= https://erlang.mk/res/relx-v3.24.5
 #RELX_URL ?= ~/vm_shared_dir/cowboy_servers/erl_pkgs/relx-v3.24.5
-RELX_URL ?= ~/vm_shared_dir/cowboy_servers/erl_pkgs/relx
+RELX_URL ?= /var/www/erl_pkgs/relx
 RELX_OPTS ?=
 RELX_OUTPUT_DIR ?= _rel
 RELX_REL_EXT ?=
