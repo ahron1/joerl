@@ -2,7 +2,7 @@ PROJECT = jo
 PROJECT_DESCRIPTION = New project
 PROJECT_VERSION = 0.1.0
 
-DEPS = cowboy cowlib ranch pgo backoff opencensus wts ctx jsx counters rfc3339 proper edown erl_img erlang_magic gen_smtp telemetry havoc 
+DEPS = cowboy cowlib ranch pgo backoff opencensus wts ctx jsx counters rfc3339 proper edown erl_img erlang_magic gen_smtp telemetry havoc pg_types
 
 dep_cowboy = cp /var/www/erl_pkgs/cowboy
 dep_cowlib = cp /var/www/erl_pkgs/cowlib
@@ -21,6 +21,7 @@ dep_rfc3339 = cp /var/www/erl_pkgs/rfc3339
 dep_proper = cp /var/www/erl_pkgs/proper
 dep_telemetry = cp /var/www/erl_pkgs/telemetry
 dep_havoc = cp /var/www/erl_pkgs/havoc
+dep_pg_types = cp /var/www/erl_pkgs/pg_types
 
 dep_crontab = cp /var/www/erl_pkgs/crontab
 dep_stdlib2 = cp /var/www/erl_pkgs/stdlib2
