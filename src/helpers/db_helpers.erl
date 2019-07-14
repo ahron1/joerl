@@ -213,7 +213,7 @@ disable_pw_token(Id) ->
 % %% imagery
 %% save image details to db via upload_handler_special. 
 image_details_to_db_special(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
-	{{select, 1}, [{NewImageId, {citext, Adj1Text}, {citext, Adj2Text}}]} = pp_db:extended_query("
+	{{select, 1}, [{NewImageId, Adj1Text, Adj2Text}]} = pp_db:extended_query("
 		with 
 		   -- input details from server
 		   userid as (
@@ -395,7 +395,7 @@ image_details_to_db_special(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj
 %% save image details to db via webform
 %% difference with previous fun is the hardcoded value of syspic_bool
 image_details_to_db(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
-	{{select, 1}, [{NewImageId, {citext, Adj1Text}, {citext, Adj2Text}}]} = pp_db:extended_query("
+	{{select, 1}, [{NewImageId, Adj1Text, Adj2Text}]} = pp_db:extended_query("
 		with 
 		   -- input details from server
 		   userid as (
