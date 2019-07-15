@@ -181,7 +181,7 @@ file_storage(FileSize, MinFileSize,  MaxFileSize, FinalFileName, FileNameWithPat
 	{Body, Status};
 
 file_storage(FileSize, _MinFileSize,  MaxFileSize, _FinalFileName, _FileNameWithPath, _TempFile, _FileData, _User, _ImageUri, _Adj1, _Adj2) when (FileSize > MaxFileSize)  ->
-	Body = <<"File too large">>,
+	Body = <<"File too large. Please resize or compress the image and try again.">>,
 	Status = 500,
 	{Body, Status};
 
