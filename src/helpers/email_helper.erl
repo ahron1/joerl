@@ -16,7 +16,7 @@ send_pw_reset_email(TokenValue, Id, Login) ->
 
 % create email body to be sent after receiving pw reset request
 build_pw_reset_email(TokenValue, Id, UserEmail) -> 
-	Domain = "https://192.168.64.2/",
+	Domain = "https://jochoice.com/",
 	ResetRoute = "password/",
 	TokenString = binary:bin_to_list(TokenValue),
 	ResetLink = general_helpers:list_merge_no_sort([Domain, ResetRoute, TokenString]),
@@ -51,7 +51,7 @@ send_signup_token_email(TokenValue, Id, Login, UserName) ->
 build_signup_token_email(TokenValue, _Id, UserEmail, Name) -> 
 	%some of the variable names in this function (e.g. ResetRoute, etc.) are inappropriate, because they are derived from the earlier build_pw_reset_email.
 	%todo - change the variable names to be appropriate to this module. 
-	Domain = "https://192.168.64.2/",
+	Domain = "https://jochoice.com/",
 	ResetRoute = "join/",
 	TokenString = binary:bin_to_list(TokenValue),
 	ResetLink = general_helpers:list_merge_no_sort([Domain, ResetRoute, TokenString]),
