@@ -237,9 +237,9 @@ image_details_to_db_special(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj
 		   ,syspic_bool as (
 		   select ('true'::boolean) as tf
 		   )
-		   ,active_pic_bool as (
-		   select ('true'::boolean) as tf
-		   )
+--		   ,active_pic_bool as (
+--		   select ('true'::boolean) as tf
+--		   )
 	   -- check conditions and insert into db
 		   ,w1 as ( 
 		   select word, property_of
@@ -285,8 +285,8 @@ image_details_to_db_special(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj
    		   returning id
  		   )     
  		   ,pp as (
- 		   insert into picture_property(property_of, filename, picture_uri, complete_path, is_system_picture, is_picture_active)
- 		   select id, (select filename from picfilename), (select uri from picuri), (select path from completepath), (select tf from syspic_bool), (select tf from active_pic_bool) from p
+ 		   insert into picture_property(property_of, filename, picture_uri, complete_path, is_system_picture)
+ 		   select id, (select filename from picfilename), (select uri from picuri), (select path from completepath), (select tf from syspic_bool) from p
 		   on conflict  
 		   do nothing  --on duplicate file (name) do nothing (fail silently)
  		   )

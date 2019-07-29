@@ -18,7 +18,7 @@ init(Req0, Opts) ->
 %% check loggedin status and process upload request
 upload_processor(has_session_cookie, User, Req0) ->
 	MaxFileSize = 4500000, %bytes 4.5MB
-	MinFileSize = 4500, %bytes 4.5KB
+	MinFileSize = 20000, %bytes 20KB
 	{FileData, FileName, FileSize, Adj1, Adj2} = extract_file_and_adjs(Req0),
 	{ok, FileMime} = emagic:from_buffer(FileData), % Mime based on magic numbers
 
