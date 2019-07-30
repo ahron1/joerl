@@ -164,7 +164,7 @@ pw_form_body() ->
 				document.getElementById(\"new-password\").value=\"\";
 				document.getElementById(\"user-email\").value=\"\";
 				if (xhr.status == 200) {
-					window.location.href=\"https://192.168.64.2\";
+					window.location.href=\"https://jochoice.com\";
 					//alert(\"js alert: password changed. login again\")
 					}
 //				else {
