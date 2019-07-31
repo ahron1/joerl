@@ -63,7 +63,7 @@ set_new_pw(Req0) ->
 					%also delete any session cookies for that Id
 					{{delete, _}, _} = db_helpers:delete_session_cookie(Id),
 					%also send welcome email. 
-					%email_helper:send_welcome_email(Login, Id),
+					email_helper:send_welcome_email(Login, Id),
 					%server redirect upon post isn't standard practice
 					%so send 200 and have js do the redirection
 					%H_redir = #{<<"Location">> => <<"https://192.168.43.220:8765">>},
