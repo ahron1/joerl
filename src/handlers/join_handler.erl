@@ -41,7 +41,7 @@ new_join_req(Req0) ->
 %process existing account depending on conditions
 %process_existing_account(Login, FirstName, Id, ActiveStatus, InvitedOrFresh).
 process_existing_account(_, _, _, true, _) ->
-	{200, #{<<"content-type">> => <<"text/plain">>}, <<"there's already an account for this email. please try logging in.">>};
+	{200, #{<<"content-type">> => <<"text/plain">>}, <<"There's already an account for this email. Please try logging in.">>};
 process_existing_account(Login, FirstName, Id, false, invited) ->
 	%there exists an entry for this login - either via marketing or user invite. 
 	{{update, 1}, _} = db_helpers:update_name(Id, FirstName),

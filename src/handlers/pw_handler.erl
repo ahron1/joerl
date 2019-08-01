@@ -35,7 +35,7 @@ reset_request(Req0) ->
 			[{Id}] = IdTupleList,
 			{{insert, 1}, [{TokenValue}]} = db_helpers:create_pw_token(Id),
 			email_helper:send_pw_reset_email(TokenValue, Id, Login),
-			{200, H, <<"password change">>}
+			{200, H, <<"Password change request received successfully. Please check your email.">>}
 			;
 		_ ->
 			%Invalid login. try again
