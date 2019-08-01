@@ -105,7 +105,7 @@ token_validation(PwToken) ->
 			{200, H_form, Body_form}
 			;
 		_ ->
-			{400, H, <<"This token is invalid, please submit a fresh reset request..">>}
+			{400, H, <<"This token is now invalid, please submit a fresh reset request..">>}
 			% to do: consider sending just a custom 404 instead of a meaningful response to the client, less communicative server is better for security
 	end,
 	{S1, H1, B1}.

@@ -19,7 +19,7 @@ build_welcome_email(Id, UserEmail) ->
 	Domain = "https://jochoice.com/",
 	UserName = binary:bin_to_list(db_helpers:name_given_id(Id)),
 	EmailBody1 = "Hi ",
-	EmailBody2 = "Your new beta account is now ready for you. Your password has been set, and your login id/username is your email address." ,
+	EmailBody2 = "Your account is now ready for you. Your password has been set, and your login id/username is your email address." ,
 	EmailBody3 = "You are now all set, to login, browse, and vote as you choose.",
 	EmailBody4 = "We look forward to seeing you quite often at JoChoice.." ,
 	NewLine = "\n",
