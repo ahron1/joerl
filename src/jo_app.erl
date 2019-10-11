@@ -31,9 +31,9 @@ make_dispatch() ->
 							 ,{"/messagehandler", message_handler, []}
 							 ,{"/imagehandler", image_handler, []}
 							 ,{"/voteshandler", votes_handler, []}
-							 ,{"/join/[:join_token]", join_handler, []}
-							 %,{"/resetpassword/[:pw_token]", pw_reset_handler, []}
-							 ,{"/password/[:pw_token]", pw_handler, []}
+							 ,{"/join/:join_token", join_handler, []}
+							 ,{"/user/:handle/[:profile_action]", profile_handler, []} 
+							 ,{"/password/:pw_token", pw_handler, []}
 							 ,{'_', general_handler, []}
 							 ]}
 						 ]).

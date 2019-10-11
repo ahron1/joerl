@@ -1,10 +1,11 @@
 -module(db_helpers).
 
--export([id_given_login_pw/2, id_given_login/1, get_sys_user/0, name_given_id/1, active_status_given_id/1, is_invited_given_id/1, is_fresh_given_id/1, update_name/2, is_waiting_over/1, new_account_creation/2, create_signup_token/1, id_given_signup_token/1, activate_new_account/1]). 
+-export([id_given_login_pw/2, id_given_login/1, id_given_handle/1, get_sys_user/0, name_given_id/1, active_status_given_id/1, is_invited_given_id/1, is_fresh_given_id/1, update_name/2, is_waiting_over/1, new_account_creation/2, create_signup_token/1, id_given_signup_token/1, activate_new_account/1]). 
 -export([id_given_cookie/1, create_session_cookie/1, delete_session_cookie/1, cookie_given_id/1, log_signin/2, log_signout/1]). 
 -export([create_pw_token/1, id_given_valid_pw_token/1, update_pw/2, activate_pw_token/1, check_valid_pw_token/1, disable_pw_token/1]).
 -export([image_details_to_db/6, image_details_to_db_special/6, get_new_pics/1, get_this_pic/1, record_votes/5]).
 -export([update_vetted_adj/0]).
+-export([testing/1]).
 
 % %% account/id/pw
 %% get user id given submitted id/pw for logging in
@@ -17,6 +18,11 @@ id_given_login(FormLogin) ->
 	{{select, N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_credentials where email=$1", [FormLogin]),
 	{{select, N}, IdTupleList}.
 
+%% get user id given handle
+id_given_handle(Handle) ->
+	{{select, N}, IdTupleList} = pp_db:extended_query("select property_of from person_property_credentials where handle=$1", [Handle]),
+	{{select, N}, IdTupleList}.
+	
 %% get random system user id (for uploading system pics)
 get_sys_user() ->
 	{{select, 1}, IdTupleList} = pp_db:simple_query("select property_of from person_property_credentials where is_system_user=true order by random() limit 1"),
@@ -229,10 +235,10 @@ image_details_to_db_special(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj
 		   select ($4) as path
 		   )
 		   ,inputword1 as ( 
-		   select ($5) as inputword
+		   select ($5::citext) as inputword
 		   )
 		   ,inputword2 as (
-		   select ($6) as inputword
+		   select ($6::citext) as inputword
 		   )
 		   ,syspic_bool as (
 		   select ('true'::boolean) as tf
@@ -411,10 +417,10 @@ image_details_to_db(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
 		   select ($4) as path
 		   )
 		   ,inputword1 as ( 
-		   select ($5) as inputword
+		   select ($5::citext) as inputword
 		   )
 		   ,inputword2 as (
-		   select ($6) as inputword
+		   select ($6::citext) as inputword
 		   )
 		   ,syspic_bool as (
 		   select ('false'::boolean) as tf
@@ -615,6 +621,7 @@ get_new_pics(UserId) ->
 		adjs as yy
 		on xx.row_number = yy.row_number
 		)
+-- the next lines were to ensure that pics were not repeated in the same session
 --		,sessionpics as (
 --		update person_property_session 
 --		set pics =  pics || (select array_agg(pic_id) from paa)
@@ -750,4 +757,185 @@ update_vetted_adj() ->
 %if it is necessary to use quoted column names escape the quotes as below:
 %{{select,N}, UserId} = pp_db:extended_query("select \"userid\" from cookietable where value = $1", [Cookie]),
 
+% %% testing dummies
+%testing(UserId, NewFileName, PicUri, CompletePath, Adj1, Adj2) ->
+testing(Adj2) ->
+	{{select, 1}, _} = pp_db:extended_query("
+		with 
+		   -- input details from server
+--		   userid as (
+--		   select ($1::int) as id
+--		   )
+--		   ,picfilename as ( 
+--		   select ($2) as filename
+--		   )
+--		   ,picuri as ( 
+--		   select ($3) as uri
+--		   )
+--		   ,completepath as ( 
+--		   select ($4) as path
+--		   )
+--		   ,inputword1 as ( 
+--		   select ($5) as inputword
+--		   )
+		   inputword2 as (
+		   select ($1::citext) as inputword
+		   )
+--		   ,syspic_bool as (
+--		   select ('false'::boolean) as tf
+--		   )
+--	   -- check conditions and insert into db
+--		   ,w1 as ( 
+--		   select word, property_of
+--		   from   adjective_property
+--		   where  word = (select inputword from inputword1)
+--		   )
+--		   ,a1 as (
+--		   insert into adjective            
+--		   select                          
+--		   where not exists (select from w1)
+--		   returning id
+--		   )
+--		   ,ap1 as (
+--		   insert into adjective_property (word, property_of) 
+--		   select (select inputword from inputword1), id
+--		   from   a1
+--		   on conflict  
+--		   do nothing  --on duplicate file (name) do nothing (fail silently)
+--		   returning word, property_of
+--		   )
+		   ,w2 as (
+		   select word, property_of
+		   from   adjective_property
+		   where  word = (select inputword from inputword2)
+		   )
+--		   ,a2 as (
+--     	   insert into adjective            
+--   		   select                          
+--		   where not exists (select from w2)
+--		   returning id
+--		   )
+--		   ,ap2 as (
+--		   insert into adjective_property (word, property_of) 
+--		   select (select inputword from inputword2), id
+--		   from   a2
+--		   on conflict  
+--		   do nothing  --on duplicate file (name) do nothing (fail silently)
+--		   returning word, property_of
+--		   ) 
+--		   ,p as ( 
+--		   insert into picture
+--   		   values(default)
+--   		   returning id
+-- 		   )     
+-- 		   ,pp as (
+-- 		   insert into picture_property(property_of, filename, picture_uri, complete_path, is_system_picture)
+-- 		   select id, (select filename from picfilename), (select uri from picuri), (select path from completepath), (select tf from syspic_bool) from p
+--		   on conflict  
+--		   do nothing  --on duplicate file (name) do nothing (fail silently)
+-- 		   )
+-- 		   ,person2p as (
+-- 		   insert into person_to_picture(source, target)
+-- 		   select (select id from userid), id from p
+-- 		   returning id
+-- 		   )
+-- 		   ,person2pp as ( 
+-- 		   insert into person_to_picture_property(property_of, is_uploader)
+-- 		   select id, 'true' from person2p
+--		   )
+--		   ,a2p1 as ( 
+--		   insert into adjective_to_picture(source, target) 
+--		   values ((select property_of from ap1 union all select property_of from w1), (select id from p))
+--		   returning id, target, source 
+--		   )
+--		   ,a2pp1 as (
+--		   insert into adjective_to_picture_property(property_of, coupled_by) 
+--		   select id, (select id from userid) from a2p1
+--		   )
+--		   ,a2p2 as (
+--		   insert into adjective_to_picture(source, target) 
+--		   values ((select property_of from ap2 union all select property_of from w2), (select id from p))
+--		   returning id, target, source
+--		   )
+--		   ,a2pp2 as (
+--		   insert into adjective_to_picture_property(property_of, coupled_by) 
+--		   select id, (select id from userid) from a2p2
+--		   )
+--	  	   ,a2a_new as (
+--		   insert into adjective_to_adjective(source, target)
+--		   values ( 
+--				(select property_of from w1 union all select property_of from ap1) 
+--				,(select property_of from w2 union all select property_of from ap2)
+--				)
+--		   on conflict  
+--		   do nothing 
+--		   returning source, target, id
+--		   )
+--		   ,a2ap as ( 
+--		   insert into adjective_to_adjective_property (property_of, is_pair)
+--		   select id, 'true' from a2a_new
+--		   where exists (select 1 from a2a_new) 
+--		   returning id, property_of
+--		   )
+--		   ,person2a1 as ( 
+--		   insert into person_to_adjective(source, target) 
+--		   select (select id from userid), property_of from ap1
+--		   where exists (select 1 from ap1) 
+--		   returning id, target, source
+--		   )
+--		   ,person2a1p as (
+--		   insert into person_to_adjective_property(property_of, is_uploader) 
+--		   select id, 'true' from person2a1
+--		   where exists (select 1 from person2a1)
+--		   )    
+--		   ,person2a2 as (
+--		   insert into person_to_adjective(source, target) 
+--		   select (select id from userid), property_of from ap2
+--		   where exists (select 1 from ap2)
+--		   returning id, target, source
+--		   )
+--		   ,person2a2p as ( 
+--		   insert into person_to_adjective_property(property_of, is_uploader) 
+--		   select id, 'true' from person2a2
+--		   where exists (select 1 from person2a2)
+--		   )    
+--		   -- join tables and select output
+
+	select * from w2
+
+--	    select p.id as pic, w1.word as adj1, w2.word as adj2 
+--		from p
+--		join a2p1 on p.id = a2p1.target
+--		join w1 on w1.property_of = a2p1.source
+--		join a2p2 on p.id = a2p2.target
+--		join w2 on w2.property_of = a2p2.source
+--
+--		union all 
+--
+--		select p.id as pic, ap1.word as adj1, ap2.word as adj2 
+--		from p
+--		join a2p1 on p.id = a2p1.target
+--		join ap1 on ap1.property_of = a2p1.source
+--		join a2p2 on p.id = a2p2.target
+--		join ap2 on ap2.property_of = a2p2.source
+--
+--		union all 
+--
+--		select p.id as pic, w1.word as adj1, ap2.word as adj2 
+--		from p
+--		join a2p1 on p.id = a2p1.target
+--		join w1 on w1.property_of = a2p1.source
+--		join a2p2 on p.id = a2p2.target
+--		join ap2 on ap2.property_of = a2p2.source
+--
+--		union all 
+--
+--		select p.id as pic, ap1.word as adj1, w2.word as adj2 
+--		from p
+--		join a2p1 on p.id = a2p1.target
+--		join ap1 on ap1.property_of = a2p1.source
+--		join a2p2 on p.id = a2p2.target
+--		join w2 on w2.property_of = a2p2.source
+	", [Adj2 ]).
+	%%{NewImageId, Adj1Text, Adj2Text}.
 

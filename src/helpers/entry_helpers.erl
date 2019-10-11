@@ -45,3 +45,7 @@ extract_signup_details(OriginalRequest) ->
 	SignupDetails = {FormLogin, FirstName},
 	erlang:display(SignupDetails),
 	SignupDetails.
+
+%%get Id given handle
+%extract_id_from_handle()
+
