@@ -1,5 +1,7 @@
 -module(login_handler).
 -export([init/2]).
+%set_cookie also needs to be exported because it is called by join_handler. 
+-export([set_cookie/2]).
 
 init(Req0, Opts) ->
 	{SessionCookieStatus, _UserId} = entry_helpers:check_session_cookie(Req0),
@@ -16,7 +18,8 @@ init(Req0, Opts) ->
 set_reply_values(OriginalRequest, has_no_session_cookie, has_body) ->
 	%No cookie but has body = login req. 
 	%erlang:display(login_req),
-	check_in(OriginalRequest);
+	{FormLogin, FormPassword, FingerPrint} = entry_helpers:extract_login_pw_fp(OriginalRequest),
+	check_in(FormLogin, FormPassword, FingerPrint, OriginalRequest );
 set_reply_values(OriginalRequest, has_session_cookie, _) ->
 	%erlang:display(ongoing_session),
 	%Has cookie with value matching key 'session' = ongoing session 
@@ -27,9 +30,29 @@ set_reply_values(OriginalRequest, _, _) ->
 	{<<"ERRONEOUS REQUEST">>, 400, OriginalRequest}.
 
 %%check login details, return http status, and set a cookie if okay. 
-check_in(OriginalRequest) ->
-	{FormLogin, FormPassword} = entry_helpers:extract_login_pw(OriginalRequest),
-	%get user id from db and if the given login/pw are a match
+%first take care of the guests with no accounts
+check_in(<<>>, <<>>, FingerPrint, OriginalRequest) ->
+	erlang:display(FingerPrint),
+	{{select,N}, IdTupleList} = db_helpers:id_given_fingerprint(FingerPrint),
+	case N of 
+		1 ->
+			erlang:display(repeat_guest),
+			[{Id}] = IdTupleList,
+			erlang:display(Id),
+			set_cookie(Id, OriginalRequest);
+			%{<<"Guest account">>, 200, OriginalRequest};
+		0 ->
+			erlang:display(login_handler_new_guest),
+			GuestId = guests_helpers:create_new_guest(FingerPrint),
+			erlang:display(GuestId),
+			{<<"Guest account">>, 200, OriginalRequest};
+		_ ->
+			erlang:display(problem_login),
+			{<<"Erroneous login, please contact us">>, 400, OriginalRequest}
+	end;
+
+%then the regular users with accounts
+check_in(FormLogin, FormPassword, _, OriginalRequest) ->
 	{{select,N}, IdTupleList} = db_helpers:id_given_login_pw(FormLogin, FormPassword),
 	erlang:display(IdTupleList),
 	% case on number of rows returned by the query

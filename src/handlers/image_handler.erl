@@ -23,9 +23,10 @@ init(Req0, Opts) ->
 %todo: update db fun to also return size of session.pics array and insert new fun here to reset array to empty if it is too big. 
 send_image(WhichImage, has_session_cookie, User) when ((WhichImage == <<>>) or (WhichImage == <<"/">>)) ->
 	NextImagesInfo = db_helpers:get_new_pics(User),
+	%NextImagesInfo format - {PicIdInt, Adj1, Adj1Id, Adj2, Adj2Id, Uri} 
 	NextImagesAdjsList = image_helpers:extract(NextImagesInfo),
 	RBody = jsx:encode(NextImagesAdjsList),
-	%erlang:display(RBody),
+	erlang:display(NextImagesInfo),
 	RStatus = 200,
 	{RBody, RStatus};
 send_image(WhichImage, has_session_cookie, User) ->

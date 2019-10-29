@@ -1,21 +1,26 @@
 %%% handler for making new user accounts. this design of this handler is tightly coupled with the marketing db tables - for making waitlists, inviting potential users, etc. The tentative usage, however, does not leverage this coupling, mainly because the marketing db tables (pp_acq_fresh/invited) aren't used. 
-
 -module(join_handler).
 -behavior(cowboy_handler).
 -export([init/2]).
 %% to do: update tokens to work better with nginx. from js hit ____ for new join req, /new/ for ... so nginx can pattern match for /join/[0-9a-z]+/ for the token
 
 init(Req0, State) ->
-	%JoinToken is a parameter bound to the req that either contains the token value or denotes a brand new user request with the value "new"
+	%JoinToken is a parameter bound to the req that either contains the token value or denotes a regular request new user with the value "new" or an instant signup/login request with the value "spot". "new" is no longer, and may be deprecated.
 	JoinToken = cowboy_req:binding(join_token, Req0),
-	{Status, Headers, Body} = case JoinToken of
+	%Req_r = set_req_r(Req0),
+	Req_r = case JoinToken of
 		<<"new">> ->
-			new_join_req(Req0); %called via login page
+			{Status, Headers, Body} = new_join_req(Req0), 
+			cowboy_req:reply(Status, Headers, Body, Req0);
+		<<"spot">> ->
+			{Status, Headers, Body, Req1} = spot_join_req(Req0), %called via login page
+			cowboy_req:reply(Status, Headers, Body, Req1);
 		_ -> 
-			process_token(JoinToken) %called when user clicks on emailed activation link with token. 
+			{Status, Headers, Body} = process_token(JoinToken), %called when user clicks on emailed activation link with token. 
+			cowboy_req:reply(Status, Headers, Body, Req0)
 	end,
-	Req = cowboy_req:reply(Status, Headers, Body, Req0),
-	{ok, Req, State}.
+	{ok, Req_r, State}.
+
 
 % %% handle signup request with token "new"
 new_join_req(Req0) ->
@@ -34,6 +39,23 @@ new_join_req(Req0) ->
 			{{select, _}, [{ActiveStatus}]} = db_helpers:active_status_given_id(Id),
 			InvitedOrFresh = invited_or_fresh(Id),
 			process_existing_account(Login, FirstName, Id, ActiveStatus, InvitedOrFresh);
+		_ ->
+			send_error()
+	end.
+
+% %% handle signup request with token "spot"
+spot_join_req(Req0) ->
+	{Login, Password, FirstName} = entry_helpers:extract_spot_signup_details(Req0),
+	{{select, N}, _IdTupleList} = db_helpers:id_given_login(Login),
+
+	case N of 
+		0 ->
+			% the id is not present in pp_credentials, thus there's no record of this person in the system. So create a new account 
+			create_spot_account(Login, Password, FirstName, Req0); 
+		1 ->
+			% there is a record for this email, 
+			%{200, #{<<"content-type">> => <<"text/plain">>}, <<"There's already an account for this id. Please try logging in.">>};
+			{400, #{<<"content-type">> => <<"text/plain">>}, <<"There's already an account for this id. Please try logging in.">>, Req0};
 		_ ->
 			send_error()
 	end.
@@ -77,6 +99,22 @@ create_new_account(Login, FirstName) ->
 
 			_ ->
 				send_error()
+		end.
+
+%immediately create new account
+create_spot_account(Login, Password, FirstName, Req0) -> 
+		{{select, N}, NewUserIdTupleList} = db_helpers:spot_account_creation(Login, Password, FirstName),
+		[{NewUserId}] = NewUserIdTupleList,
+		case N of 
+			1 ->
+				%new account is successfully created, now log the new user in. 
+				{Body, Status, ReqWithCookie} = login_handler:set_cookie(NewUserId, Req0),
+				Headers = #{<<"content-type">> => <<"text/plain">>},
+				{Status, Headers, Body, ReqWithCookie};
+
+			%TODO - send welcome email. 
+			_ ->
+				{400, #{<<"content-type">> => <<"text/plain">>}, <<"There was a problem during sign up. Please try again. If the problem persists, please contact us with the details.">>, Req0}
 		end.
 
 %check if user was invited or signed up afresh and return atom invited/fresh/error
